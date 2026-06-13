@@ -220,6 +220,11 @@ select:focus {
   background: var(--accent-strong);
 }
 
+.primary-button:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
 .ghost-button,
 .preview-button,
 .table-action,
@@ -236,6 +241,12 @@ select:focus {
 .table-action:hover,
 .upload-button:hover {
   background: var(--surface-subtle);
+}
+
+.ghost-button:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .preview-button {
@@ -291,6 +302,13 @@ select:focus {
 
 .upload-button input {
   display: none;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .folder-form {
@@ -488,12 +506,14 @@ tbody tr:last-child td {
   }
 
   .topbar-actions,
+  .toolbar-actions,
   .folder-form,
   .admin-form {
     width: 100%;
   }
 
   .topbar-actions .ghost-button,
+  .toolbar-actions .ghost-button,
   .folder-form .primary-button,
   .upload-button {
     flex: 1;

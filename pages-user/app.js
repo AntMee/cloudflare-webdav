@@ -19,10 +19,12 @@ const elements = {
   userList: document.querySelector("#user-list"),
   userEmptyState: document.querySelector("#user-empty-state"),
   refreshFiles: document.querySelector("#refresh-files"),
+  backFolder: document.querySelector("#back-folder"),
   userLogoutButton: document.querySelector("#user-logout-button"),
   fileInput: document.querySelector("#file-input"),
   folderForm: document.querySelector("#folder-form"),
   folderName: document.querySelector("#folder-name"),
+  createFolderButton: document.querySelector("#create-folder-button"),
   fileSearch: document.querySelector("#file-search"),
   fileList: document.querySelector("#file-list"),
   emptyState: document.querySelector("#empty-state"),
@@ -36,9 +38,11 @@ elements.refreshUsers.addEventListener("click", loadUsers);
 elements.adminLogoutButton.addEventListener("click", logout);
 elements.userSearch.addEventListener("input", renderUsers);
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
+elements.backFolder.addEventListener("click", goBackFolder);
 elements.userLogoutButton.addEventListener("click", logout);
 elements.fileInput.addEventListener("change", handleUpload);
 elements.folderForm.addEventListener("submit", handleCreateFolder);
+elements.folderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
 elements.fileSearch.addEventListener("input", renderFiles);
 
 if (state.adminToken) {
@@ -229,6 +233,11 @@ async function loadDirectory(path) {
   }
 }
 
+function goBackFolder() {
+  if (state.currentPath === "/") return;
+  loadDirectory(parentDirectory(state.currentPath));
+}
+
 async function handleUpload() {
   const files = [...elements.fileInput.files];
   elements.fileInput.value = "";
@@ -259,10 +268,11 @@ async function handleCreateFolder(event) {
   event.preventDefault();
   const name = elements.folderName.value.trim();
   if (!/^[^\\/:*?"<>|]{1,80}$/.test(name)) {
-    showToast("文件夹名称无效", true);
+    showToast(name ? "文件夹名称无效" : "请输入文件夹名称", true);
     return;
   }
 
+  elements.createFolderButton.disabled = true;
   try {
     const response = await fetch(davUrl(ensureDirectory(joinPath(state.currentPath, name))), {
       method: "MKCOL",
@@ -274,6 +284,8 @@ async function handleCreateFolder(event) {
     showToast("文件夹已创建");
   } catch (error) {
     showToast(error.message, true);
+  } finally {
+    elements.createFolderButton.disabled = false;
   }
 }
 
@@ -435,6 +447,8 @@ function renderBreadcrumbs() {
   elements.breadcrumbs.querySelectorAll("[data-path]").forEach((button) => {
     button.addEventListener("click", () => loadDirectory(button.dataset.path));
   });
+
+  elements.backFolder.disabled = state.currentPath === "/";
 }
 
 async function adminApi(path, options = {}) {
@@ -496,6 +510,12 @@ function joinPath(base, name) {
 function ensureDirectory(path) {
   if (path === "/") return "/";
   return path.endsWith("/") ? path : `${path}/`;
+}
+
+function parentDirectory(path) {
+  const clean = path.endsWith("/") ? path.slice(0, -1) : path;
+  const index = clean.lastIndexOf("/");
+  return index <= 0 ? "/" : `${clean.slice(0, index)}/`;
 }
 
 function encodePathPart(value) {
