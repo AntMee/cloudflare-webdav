@@ -1,4 +1,4 @@
-# Cloudflare WebDAV D1 + KV Design
+﻿# Cloudflare WebDAV D1 + KV Design
 
 ## Goal
 
