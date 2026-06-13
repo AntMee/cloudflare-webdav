@@ -10,10 +10,8 @@
   --accent-strong: #1d4ed8;
   --danger: #dc2626;
   --danger-bg: #fef2f2;
-  --success: #15803d;
-  --success-bg: #f0fdf4;
-  --warning: #b45309;
-  --warning-bg: #fffbeb;
+  --folder: #b45309;
+  --file: #2563eb;
   --shadow: 0 18px 50px rgba(23, 32, 51, 0.08);
   --radius: 8px;
 }
@@ -29,15 +27,12 @@ body {
     linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0) 280px),
     var(--bg);
   color: var(--text);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 
 button,
-input,
-select {
+input {
   font: inherit;
 }
 
@@ -145,9 +140,8 @@ h2 {
 }
 
 .login-panel,
-.create-user,
-.user-section,
-.metric {
+.toolbar,
+.file-section {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -166,8 +160,7 @@ label {
   font-weight: 650;
 }
 
-input,
-select {
+input {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--border-strong);
@@ -180,21 +173,20 @@ select {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input:focus,
-select:focus {
+input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
-.login-panel label + label,
-.password-dialog label {
+.login-panel label + label {
   margin-top: 14px;
 }
 
 .primary-button,
 .ghost-button,
 .preview-button,
-.table-action {
+.table-action,
+.upload-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -205,7 +197,7 @@ select:focus {
   font-weight: 700;
   line-height: 1;
   border: 1px solid transparent;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .primary-button {
@@ -216,13 +208,20 @@ select:focus {
   color: #ffffff;
 }
 
+.primary-button.inline {
+  width: auto;
+  margin-top: 0;
+}
+
 .primary-button:hover {
   background: var(--accent-strong);
 }
 
 .ghost-button,
 .preview-button,
-.table-action {
+.table-action,
+.upload-button {
+  min-height: 40px;
   background: #ffffff;
   color: #334155;
   border-color: var(--border-strong);
@@ -231,7 +230,8 @@ select:focus {
 
 .ghost-button:hover,
 .preview-button:hover,
-.table-action:hover {
+.table-action:hover,
+.upload-button:hover {
   background: var(--surface-subtle);
 }
 
@@ -246,10 +246,10 @@ select:focus {
 
 .topbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .topbar-actions {
@@ -258,40 +258,46 @@ select:focus {
   align-items: center;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.breadcrumb {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 16px;
+  padding: 14px;
 }
 
-.metric {
-  padding: 18px;
+.upload-button input {
+  display: none;
 }
 
-.metric-label {
-  display: block;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 650;
+.folder-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: min(100%, 460px);
 }
 
-.metric strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 30px;
-  line-height: 1;
-}
-
-.workspace {
-  display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.create-user,
-.user-section {
+.file-section {
   padding: 18px;
 }
 
@@ -301,11 +307,6 @@ select:focus {
 
 .section-heading h2 {
   margin-bottom: 5px;
-}
-
-.field-grid {
-  display: grid;
-  gap: 13px;
 }
 
 .row-heading {
@@ -341,7 +342,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 720px;
+  min-width: 760px;
   border-collapse: collapse;
   background: #ffffff;
 }
@@ -367,23 +368,31 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 
-.user-name {
-  display: flex;
+.file-name {
+  display: inline-flex;
   align-items: center;
   gap: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
   font-weight: 750;
 }
 
-.avatar {
+.file-icon {
   display: grid;
   width: 32px;
   height: 32px;
   place-items: center;
   border-radius: 6px;
   background: #eff6ff;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 800;
+  color: var(--file);
+}
+
+.file-icon.folder {
+  background: #fffbeb;
+  color: var(--folder);
 }
 
 .badge {
@@ -392,28 +401,10 @@ tbody tr:last-child td {
   min-height: 24px;
   border-radius: 999px;
   padding: 0 9px;
-  font-size: 12px;
-  font-weight: 750;
-}
-
-.badge.admin {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
-.badge.user {
   background: #f1f5f9;
   color: #334155;
-}
-
-.badge.enabled {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
-.badge.disabled {
-  background: var(--warning-bg);
-  color: var(--warning);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .action-col {
@@ -462,65 +453,33 @@ tbody tr:last-child td {
   color: #991b1b;
 }
 
-.password-dialog {
-  width: min(420px, calc(100% - 32px));
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0;
-  box-shadow: var(--shadow);
-}
-
-.password-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.36);
-}
-
-.password-dialog form {
-  padding: 20px;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.dialog-actions .primary-button {
-  width: auto;
-  margin-top: 0;
-}
-
 @media (max-width: 860px) {
   .app-shell {
     width: min(100% - 24px, 680px);
     padding: 24px 0;
   }
 
-  .login-view,
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
   .login-view {
+    grid-template-columns: 1fr;
     align-content: center;
     gap: 22px;
   }
 
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
   .topbar,
-  .row-heading {
+  .row-heading,
+  .toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .topbar-actions {
+  .topbar-actions,
+  .folder-form {
     width: 100%;
   }
 
-  .topbar-actions .ghost-button {
+  .topbar-actions .ghost-button,
+  .folder-form .primary-button,
+  .upload-button {
     flex: 1;
   }
 
@@ -540,9 +499,12 @@ tbody tr:last-child td {
   }
 
   .login-panel,
-  .create-user,
-  .user-section,
-  .metric {
+  .file-section,
+  .toolbar {
     padding: 16px;
+  }
+
+  .folder-form {
+    flex-direction: column;
   }
 }

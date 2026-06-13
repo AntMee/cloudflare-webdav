@@ -14,6 +14,7 @@ const elements = {
   userSearch: document.querySelector("#user-search"),
   refreshUsers: document.querySelector("#refresh-users"),
   logoutButton: document.querySelector("#logout-button"),
+  previewDashboard: document.querySelector("#preview-dashboard"),
   toast: document.querySelector("#toast"),
   metricTotal: document.querySelector("#metric-total"),
   metricEnabled: document.querySelector("#metric-enabled"),
@@ -29,6 +30,7 @@ elements.loginForm.addEventListener("submit", handleLogin);
 elements.createUserForm.addEventListener("submit", handleCreateUser);
 elements.refreshUsers.addEventListener("click", loadUsers);
 elements.logoutButton.addEventListener("click", logout);
+elements.previewDashboard.addEventListener("click", showPreviewDashboard);
 elements.userSearch.addEventListener("input", renderUsers);
 elements.passwordForm.addEventListener("submit", handleResetPassword);
 elements.cancelReset.addEventListener("click", () => elements.passwordDialog.close());
@@ -36,6 +38,10 @@ elements.cancelReset.addEventListener("click", () => elements.passwordDialog.clo
 if (state.token) {
   showDashboard();
   loadUsers();
+}
+
+if (new URLSearchParams(window.location.search).get("preview") === "1") {
+  showPreviewDashboard();
 }
 
 async function handleLogin(event) {
@@ -64,6 +70,11 @@ async function handleLogin(event) {
 }
 
 async function loadUsers() {
+  if (state.token === "preview-token") {
+    seedPreviewUsers();
+    return;
+  }
+
   try {
     const body = await api("/api/admin/users");
     state.users = Array.isArray(body.users) ? body.users : [];
@@ -227,6 +238,41 @@ async function api(path, options = {}) {
 function showDashboard() {
   elements.loginView.classList.add("hidden");
   elements.dashboardView.classList.remove("hidden");
+}
+
+function showPreviewDashboard() {
+  state.token = "preview-token";
+  localStorage.setItem("webdavAdminToken", state.token);
+  showDashboard();
+  seedPreviewUsers();
+  showToast("当前是前端预览数据，未连接后端 API");
+}
+
+function seedPreviewUsers() {
+  state.users = [
+    {
+      id: "preview-admin",
+      username: "admin",
+      role: "admin",
+      enabled: true,
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "preview-alice",
+      username: "alice",
+      role: "user",
+      enabled: true,
+      updatedAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "preview-buildbot",
+      username: "buildbot",
+      role: "user",
+      enabled: false,
+      updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
+  renderUsers();
 }
 
 function logout() {

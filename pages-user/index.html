@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Cloudflare WebDAV 文件</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="login-view" id="login-view" aria-labelledby="login-title">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4.2l2 2H18a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 18 19H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
+              <path d="M7 12h10" />
+            </svg>
+          </div>
+          <div>
+            <p class="eyebrow">Cloudflare WebDAV</p>
+            <h1 id="login-title">文件空间</h1>
+            <p class="muted">使用管理员创建的 WebDAV 用户名和密码登录。</p>
+          </div>
+        </div>
+
+        <form class="login-panel" id="login-form">
+          <label for="login-username">用户名</label>
+          <input id="login-username" name="username" autocomplete="username" required />
+
+          <label for="login-password">密码</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+
+          <button class="primary-button" type="submit">
+            <span>进入文件空间</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h13" />
+              <path d="m13 6 6 6-6 6" />
+            </svg>
+          </button>
+          <button class="preview-button" id="preview-files" type="button">预览用户端页面</button>
+        </form>
+      </section>
+
+      <section class="files-view hidden" id="files-view" aria-labelledby="files-title">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Cloudflare WebDAV</p>
+            <h1 id="files-title">我的文件</h1>
+            <nav class="breadcrumbs" id="breadcrumbs" aria-label="当前位置"></nav>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="refresh-files" type="button" title="刷新">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 12a9 9 0 0 1-15.6 6.1" />
+                <path d="M3 12A9 9 0 0 1 18.6 5.9" />
+                <path d="M3 18v-5h5" />
+                <path d="M21 6v5h-5" />
+              </svg>
+              <span>刷新</span>
+            </button>
+            <button class="ghost-button" id="logout-button" type="button" title="退出">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              <span>退出</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="toolbar" aria-label="文件操作">
+          <label class="upload-button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 16V4" />
+              <path d="m7 9 5-5 5 5" />
+              <path d="M5 20h14" />
+            </svg>
+            <span>上传文件</span>
+            <input id="file-input" type="file" multiple />
+          </label>
+          <form class="folder-form" id="folder-form">
+            <input id="folder-name" name="folderName" placeholder="新建文件夹名称" autocomplete="off" />
+            <button class="primary-button inline" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>新建文件夹</span>
+            </button>
+          </form>
+        </section>
+
+        <section class="file-section" aria-labelledby="file-list-title">
+          <div class="section-heading row-heading">
+            <div>
+              <h2 id="file-list-title">文件列表</h2>
+              <p class="muted">支持浏览、上传、下载、新建文件夹和删除。</p>
+            </div>
+            <label class="search-field">
+              <span class="sr-only">搜索文件</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m21 21-4.35-4.35" />
+                <circle cx="11" cy="11" r="7" />
+              </svg>
+              <input id="file-search" placeholder="搜索当前目录" autocomplete="off" />
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>类型</th>
+                  <th>大小</th>
+                  <th>修改时间</th>
+                  <th class="action-col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="file-list"></tbody>
+            </table>
+            <div class="empty-state hidden" id="empty-state">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4.2l2 2H18a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 18 19H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
+                <path d="M8 13h8" />
+              </svg>
+              <p>当前目录为空</p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
