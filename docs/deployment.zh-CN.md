@@ -101,6 +101,8 @@ npm run deploy
 
 `npm run deploy` 会先自动创建或复用 D1/KV，并把真实 ID 写入 `wrangler.jsonc`，然后再执行迁移和 Worker 部署。直接运行 `npx wrangler deploy` 会跳过自动创建步骤，导致绑定仍然指向占位符。
 
+部署脚本会使用 `wrangler deploy --keep-vars`，用于保留你在 Cloudflare 后台手动添加的 `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`JWT_SECRET`。不要改回普通的 `wrangler deploy`，否则后台变量可能会被 `wrangler.jsonc` 覆盖。
+
 ## 4. 添加管理员变量与密钥
 
 自动部署不会把管理员密码写入 GitHub。请进入 Cloudflare：

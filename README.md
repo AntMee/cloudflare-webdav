@@ -143,6 +143,8 @@ npm run deploy
 
 原因是 `npm run deploy` 会先自动创建或复用 D1/KV，并把真实 ID 写入 `wrangler.jsonc`，然后才执行 Wrangler 部署。直接运行 `npx wrangler deploy` 会跳过这一步，导致仍然使用 `replace-with-your-kv-namespace-id` 这样的占位符。
 
+部署脚本会使用 `wrangler deploy --keep-vars`，用于保留你在 Cloudflare 后台手动添加的 `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`JWT_SECRET`。不要改回普通的 `wrangler deploy`，否则后台变量可能会被 `wrangler.jsonc` 覆盖。
+
 ### 6. 添加管理员变量与密钥
 
 管理员账号仍然建议由用户自己在 Cloudflare Worker 的变量与密钥中配置。
