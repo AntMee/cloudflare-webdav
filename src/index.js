@@ -155,16 +155,13 @@ async function propfind(env, userId, path, depth, origin) {
 
   const nodes = [node];
   if (depth !== "0" && node.kind === "directory") {
-    const prefix = path === "/" ? "/" : path;
     const result = await env.DB.prepare(
       `SELECT * FROM nodes
        WHERE owner_user_id = ?
          AND path != ?
-         AND path LIKE ?
-         AND substr(path, length(?) + 1) NOT LIKE '%/%'
        ORDER BY kind ASC, path ASC`,
-    ).bind(userId, path, `${prefix}%`, prefix).all();
-    nodes.push(...result.results);
+    ).bind(userId, path).all();
+    nodes.push(...result.results.filter((item) => isDirectChild(path, item.path)));
   }
 
   return new Response(davMultistatus(nodes, origin), {
@@ -196,8 +193,7 @@ async function putFile(request, env, userId, path) {
   const contentLength = Number(request.headers.get("content-length") || "0");
   if (contentLength > maxBytes) return text("File too large", 413);
 
-  const parent = await getNode(env.DB, userId, parentPath(path));
-  if (!parent || parent.kind !== "directory") return text("Conflict", 409);
+  await ensureParentDirectories(env.DB, userId, path);
 
   const body = await request.arrayBuffer();
   if (body.byteLength > maxBytes) return text("File too large", 413);
@@ -264,6 +260,18 @@ async function deleteEntry(env, userId, path) {
 async function ensureRoot(db, userId) {
   if (!(await getNode(db, userId, "/"))) {
     await createDirectory(db, userId, "/");
+  }
+}
+
+async function ensureParentDirectories(db, userId, path) {
+  await ensureRoot(db, userId);
+  const parts = parentPath(path).split("/").filter(Boolean);
+  let current = "/";
+  for (const part of parts) {
+    current = `${current}${part}/`;
+    if (!(await getNode(db, userId, current))) {
+      await createDirectory(db, userId, current);
+    }
   }
 }
 
@@ -379,6 +387,13 @@ function parentPath(path) {
   const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
   const index = trimmed.lastIndexOf("/");
   return index <= 0 ? "/" : `${trimmed.slice(0, index)}/`;
+}
+
+function isDirectChild(parent, child) {
+  if (child === parent || !child.startsWith(parent)) return false;
+  const rest = parent === "/" ? child.slice(1) : child.slice(parent.length);
+  const trimmed = rest.endsWith("/") ? rest.slice(0, -1) : rest;
+  return trimmed.length > 0 && !trimmed.includes("/");
 }
 
 function davMultistatus(nodes, origin) {
