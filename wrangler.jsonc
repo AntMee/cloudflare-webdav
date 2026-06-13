@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "cloudflare-webdav",
   "main": "src/index.js",
-  "compatibility_date": "2026-06-14",
+  "compatibility_date": "2026-06-13",
   "observability": {
     "enabled": true
   },
