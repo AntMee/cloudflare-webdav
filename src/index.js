@@ -25,6 +25,10 @@ export default {
         return withCors(await handleWebDav(request, env, url), request);
       }
 
+      if (request.method === "GET" || request.method === "HEAD") {
+        return env.ASSETS.fetch(request);
+      }
+
       return withCors(text("Not Found", 404), request);
     } catch (error) {
       console.error(error);

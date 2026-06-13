@@ -79,8 +79,7 @@ CLOUDFLARE_ACCOUNT_ID
 3. 把真实 D1/KV ID 写入 `wrangler.jsonc`。
 4. 执行 D1 迁移。
 5. 部署 Worker。
-6. 部署管理员 Pages。
-7. 部署用户端 Pages。
+6. 把统一登录前端作为 Worker 静态资源一起部署。
 
 也可以手动运行：
 
@@ -278,13 +277,10 @@ Build output directory: .
 webdav.halfrost.qzz.io
 ```
 
-推荐配置为：
+当前版本已经把统一登录前端作为 Worker 静态资源一起部署。推荐直接把整个自定义域名绑定到 Worker：
 
 ```text
-webdav.halfrost.qzz.io/       -> cloudflare-webdav-user Pages
-webdav.halfrost.qzz.io/api/*  -> cloudflare-webdav Worker
-webdav.halfrost.qzz.io/dav/*  -> cloudflare-webdav Worker
-webdav.halfrost.qzz.io/health -> cloudflare-webdav Worker
+webdav.halfrost.qzz.io/* -> cloudflare-webdav Worker
 ```
 
 这样访问：

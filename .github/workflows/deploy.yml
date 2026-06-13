@@ -10,8 +10,6 @@ env:
   WORKER_NAME: cloudflare-webdav
   D1_NAME: webdav_db
   KV_NAME: webdav_files
-  ADMIN_PAGES_PROJECT: cloudflare-webdav-admin
-  USER_PAGES_PROJECT: cloudflare-webdav-user
 
 jobs:
   deploy:
@@ -45,18 +43,6 @@ jobs:
 
       - name: Deploy Worker
         run: npx wrangler deploy --name "$WORKER_NAME"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Deploy admin Pages
-        run: npx wrangler pages deploy ./pages-admin --project-name "$ADMIN_PAGES_PROJECT"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Deploy user Pages
-        run: npx wrangler pages deploy ./pages-user --project-name "$USER_PAGES_PROJECT"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

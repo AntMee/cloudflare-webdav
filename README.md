@@ -43,8 +43,7 @@ docs/deployment.zh-CN.md     更详细的中文部署文档
 - 把 D1 `database_id` 和 KV `id` 写入 `wrangler.jsonc`。
 - 执行 D1 迁移。
 - 部署 Worker。
-- 部署管理员 Pages。
-- 部署用户端 Pages。
+- 把统一登录前端作为 Worker 静态资源一起部署。
 
 ### 1. 上传项目到 GitHub
 
@@ -131,7 +130,7 @@ D1 database: webdav_db
 KV namespace: webdav_files
 Worker: cloudflare-webdav
 Pages: cloudflare-webdav-admin
-Pages: cloudflare-webdav-user
+Frontend: https://你的 Worker 或自定义域名/
 ```
 
 如果你是在 Cloudflare Dashboard 的 Workers 构建页面部署，部署命令不要填写 `npx wrangler deploy`。
@@ -478,13 +477,7 @@ git push
 webdav.halfrost.qzz.io
 ```
 
-推荐把这个域名绑定到用户端 Pages 项目 `cloudflare-webdav-user`，并把 Worker 路由配置到同一个域名下：
-
-```text
-webdav.halfrost.qzz.io/api/*
-webdav.halfrost.qzz.io/dav/*
-webdav.halfrost.qzz.io/health
-```
+当前版本已经把统一登录前端作为 Worker 静态资源一起部署，所以可以把整个自定义域名绑定到 Worker。
 
 之后访问：
 
