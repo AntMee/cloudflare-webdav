@@ -21,13 +21,6 @@
 
 Worker 启动后，管理员登录接口直接读取这些绑定来验证管理员身份，并用 `JWT_SECRET` 签发管理员会话 JWT。管理员可以登录后台后创建普通 WebDAV 用户。
 
-这种方式的好处：
-
-- 不需要首个管理员 bootstrap API。
-- 不需要把管理员写入 D1。
-- 不会把管理员密码提交到代码仓库。
-- 部署流程更简单。
-
 ## 方案一：本地一键部署
 
 后续代码实现时，在项目根目录提供：
@@ -53,13 +46,6 @@ scripts/deploy.ps1
 - 提示设置 `ADMIN_USERNAME`、`ADMIN_PASSWORD` 和 `JWT_SECRET`。
 - 部署 Worker。
 - 输出 Worker 访问地址。
-
-需要你手动做的只有：
-
-- 第一次运行 `npx wrangler login` 登录 Cloudflare。
-- 输入管理员用户名。
-- 输入管理员密码。
-- 输入或自动生成 JWT_SECRET。
 
 ## 方案二：GitHub Actions 自动部署
 
@@ -89,8 +75,6 @@ GitHub 会自动：
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-D1 和 KV 建议仍然先用本地脚本创建一次，然后把资源 ID 固定在 `wrangler.jsonc`。
-
 管理员账号和 `JWT_SECRET` 仍然在 Cloudflare Worker 的变量与密钥中设置，不放进 GitHub Actions。
 
 ## Pages 管理后台部署
@@ -107,6 +91,23 @@ pages-admin
 npx wrangler pages project create cloudflare-webdav-admin
 npx wrangler pages deploy .\pages-admin --project-name cloudflare-webdav-admin
 ```
+
+## 用户端页面部署
+
+用户端前端目录是：
+
+```text
+pages-user
+```
+
+单独部署用户端：
+
+```powershell
+npx wrangler pages project create cloudflare-webdav-user
+npx wrangler pages deploy .\pages-user --project-name cloudflare-webdav-user
+```
+
+如果希望一个 Pages 项目同时包含管理员端和用户端，建议后续把 `pages-admin` 和 `pages-user` 合并到统一的 `pages/` 目录，并用 `/admin/` 与 `/user/` 分路径访问。
 
 如果 Pages 和 Worker 不在同一个域名下，需要在 Worker 中允许 Pages 域名的 CORS，或者在 Cloudflare 中用自定义域名/路由让前端和 API 同源。
 
@@ -130,9 +131,3 @@ Cloudflare 部署至少需要这些账户级操作：
 - `.github/workflows/deploy.yml`：GitHub Actions 自动部署。
 - `docs/deployment.zh-CN.md`：完整中文部署说明。
 - 管理员认证读取 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`，JWT 签名读取 `JWT_SECRET`，不再实现 bootstrap 创建管理员接口。
-<<<<<<< HEAD
-=======
-
-
-
->>>>>>> 7239ade (feat: add admin frontend)
