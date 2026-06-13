@@ -19,8 +19,6 @@
 ```text
 pages-admin/                 管理员后台页面
 pages-user/                  普通用户文件管理页面
-scripts/deploy.ps1           Windows 一键部署脚本
-scripts/deploy.sh            Linux/macOS 一键部署脚本
 docs/deployment.zh-CN.md     更详细的中文部署文档
 ```
 
@@ -36,156 +34,184 @@ docs/deployment.zh-CN.md     更详细的中文部署文档
 
 `ADMIN_PASSWORD` 和 `JWT_SECRET` 不要提交到 GitHub。
 
-## 部署方式一：Cloudflare 手动部署
+## 部署方式一：Cloudflare Dashboard 部署
 
-适合不想使用 GitHub Actions，只想在本机部署的用户。
+适合希望直接在 `https://dash.cloudflare.com/` 中操作部署的用户。推荐先把代码上传到 GitHub，然后在 Cloudflare Dashboard 中连接 GitHub 仓库。
 
-### 1. 安装 Node.js
-
-请先安装 Node.js 18 或更高版本。
-
-检查版本：
+### 1. 上传项目到 GitHub
 
 ```powershell
-node -v
-npm -v
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/你的用户名/cloudflare-webdav.git
+git push -u origin main
 ```
 
-### 2. 登录 Cloudflare
-
-在项目根目录执行：
+如果提示远端已有内容：
 
 ```powershell
-npx wrangler login
+git pull --rebase origin main
+git push
 ```
 
-登录成功后检查账号：
+### 2. 创建 D1 数据库
 
-```powershell
-npx wrangler whoami
+打开 Cloudflare Dashboard：
+
+```text
+https://dash.cloudflare.com/
 ```
 
-### 3. 创建 D1 数据库
+进入：
 
-```powershell
-npx wrangler d1 create cloudflare-webdav
+```text
+Workers & Pages -> D1 SQL Database -> Create database
 ```
 
-把命令返回的 `database_id` 填入 `wrangler.jsonc` 的 D1 绑定。
+数据库名称建议填写：
 
-### 4. 创建 KV 命名空间
-
-```powershell
-npx wrangler kv namespace create cloudflare-webdav-files
+```text
+cloudflare-webdav
 ```
 
-把命令返回的 `id` 填入 `wrangler.jsonc` 的 KV 绑定。
+创建完成后，记录 D1 数据库 ID，后续绑定 Worker 时会用到。
 
-### 5. 设置 Worker 变量与密钥
+### 3. 创建 KV 命名空间
 
-管理员用户名可以在 Cloudflare 后台设置为普通变量：
+进入：
+
+```text
+Workers & Pages -> KV -> Create namespace
+```
+
+命名空间名称建议填写：
+
+```text
+cloudflare-webdav-files
+```
+
+创建完成后，记录 KV Namespace ID，后续绑定 Worker 时会用到。
+
+### 4. 创建或导入 Worker
+
+进入：
+
+```text
+Workers & Pages -> Create application -> Worker
+```
+
+如果 Cloudflare 页面提供连接 GitHub 仓库的入口，可以选择导入你的 GitHub 仓库。如果使用在线编辑器，则需要把 Worker 后端代码放入 Worker 中。
+
+Worker 名称建议填写：
+
+```text
+cloudflare-webdav
+```
+
+### 5. 绑定 D1 和 KV
+
+进入 Worker 项目：
+
+```text
+Settings -> Bindings
+```
+
+添加 D1 绑定：
+
+```text
+Variable name: DB
+D1 database: cloudflare-webdav
+```
+
+添加 KV 绑定：
+
+```text
+Variable name: FILES
+KV namespace: cloudflare-webdav-files
+```
+
+如果你的 Worker 代码中使用了其他绑定名称，请以代码中的名称为准。
+
+### 6. 添加管理员变量与密钥
+
+进入 Worker 项目：
+
+```text
+Settings -> Variables and Secrets
+```
+
+添加普通变量：
 
 ```text
 ADMIN_USERNAME=你的管理员用户名
 ```
 
-管理员密码和 JWT 密钥使用 Secret：
+添加 Secret：
 
-```powershell
-npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put JWT_SECRET
+```text
+ADMIN_PASSWORD=你的管理员密码
+JWT_SECRET=随机长字符串
 ```
 
-`JWT_SECRET` 可以使用随机字符串，例如：
+`JWT_SECRET` 可以使用类似下面的随机字符串：
 
 ```text
 f5b8a67d7b9b4f4f8d0b9d2e4a7c9f3e
 ```
 
-### 6. 执行 D1 迁移
+### 7. 部署管理员后台 Pages
 
-如果项目中存在 `migrations/` 目录，执行：
+进入：
 
-```powershell
-npx wrangler d1 migrations apply cloudflare-webdav --remote
+```text
+Workers & Pages -> Create application -> Pages -> Connect to Git
 ```
 
-### 7. 部署 Worker
+选择你的 GitHub 仓库后，创建管理员后台 Pages 项目：
 
-```powershell
-npx wrangler deploy
+```text
+Project name: cloudflare-webdav-admin
+Production branch: main
+Root directory: pages-admin
+Build command: 留空
+Build output directory: .
 ```
 
-### 8. 部署管理员后台 Pages
+保存并部署。
 
-```powershell
-npx wrangler pages project create cloudflare-webdav-admin
-npx wrangler pages deploy .\pages-admin --project-name cloudflare-webdav-admin
+### 8. 部署用户端 Pages
+
+再次进入：
+
+```text
+Workers & Pages -> Create application -> Pages -> Connect to Git
 ```
 
-### 9. 部署用户端 Pages
+选择同一个 GitHub 仓库，创建用户端 Pages 项目：
 
-```powershell
-npx wrangler pages project create cloudflare-webdav-user
-npx wrangler pages deploy .\pages-user --project-name cloudflare-webdav-user
+```text
+Project name: cloudflare-webdav-user
+Production branch: main
+Root directory: pages-user
+Build command: 留空
+Build output directory: .
 ```
 
-如果 Pages 和 Worker 不在同一个域名下，需要给 Worker 配置 CORS，或者在 Cloudflare 中绑定自定义域名，让前端和 API 保持同源。
+保存并部署。
 
-## 部署方式二：一键脚本部署
+Cloudflare Pages 官方 Git 集成支持连接 GitHub 仓库，推送代码后会自动构建和部署。参考 Cloudflare 文档：[Pages Git integration](https://developers.cloudflare.com/pages/get-started/git-integration/)。
 
-适合想减少手动操作的用户。
+### 9. 配置同源访问
 
-### Windows
+用户端页面需要访问 Worker 的 `/api/*` 和 `/dav/*` 接口。推荐使用其中一种方式：
 
-```powershell
-npx wrangler login
-.\scripts\deploy.ps1
-```
+- 给 Worker 和 Pages 配置同一个自定义域名下的路由。
+- 在 Worker 中允许 Pages 域名跨域访问。
+- 把前端 API 地址配置为你的 Worker 地址。
 
-只部署前端页面：
-
-```powershell
-.\scripts\deploy.ps1 -SkipWorker
-```
-
-自定义资源名称：
-
-```powershell
-.\scripts\deploy.ps1 `
-  -WorkerName cloudflare-webdav `
-  -D1Name cloudflare-webdav `
-  -KVNamespaceName cloudflare-webdav-files `
-  -AdminPagesProject cloudflare-webdav-admin `
-  -UserPagesProject cloudflare-webdav-user
-```
-
-### Linux / macOS
-
-```bash
-npx wrangler login
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
-
-只部署前端页面：
-
-```bash
-SKIP_WORKER=1 ./scripts/deploy.sh
-```
-
-自定义资源名称：
-
-```bash
-WORKER_NAME=cloudflare-webdav \
-D1_NAME=cloudflare-webdav \
-KV_NAMESPACE_NAME=cloudflare-webdav-files \
-ADMIN_PAGES_PROJECT=cloudflare-webdav-admin \
-USER_PAGES_PROJECT=cloudflare-webdav-user \
-./scripts/deploy.sh
-```
-
-## 部署方式三：GitHub 自动部署
+## 部署方式二：GitHub Actions 自动部署
 
 适合代码已经上传到 GitHub，希望每次 push 后自动部署到 Cloudflare 的用户。
 

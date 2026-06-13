@@ -1,203 +1,214 @@
-# Cloudflare WebDAV 部署教程
+# Cloudflare Dashboard 部署教程
 
-本文档说明如何把 Cloudflare WebDAV 部署到 Cloudflare。项目分为三部分：
+本文档说明如何在 `https://dash.cloudflare.com/` 中部署 Cloudflare WebDAV。
+
+项目分为三部分：
 
 - **Worker 后端**：提供 WebDAV 接口和管理员 API。
-- **Pages 管理后台**：`pages-admin/`，管理员创建和管理用户。
-- **Pages 用户端**：`pages-user/`，普通用户在浏览器中管理文件。
+- **Pages 管理员后台**：`pages-admin/`。
+- **Pages 用户端文件管理器**：`pages-user/`。
 
-当前仓库已经包含管理员端和用户端前端页面。Worker 后端代码实现完成后，一键部署脚本会自动部署完整服务；在后端代码完成前，脚本会跳过 Worker 部署，只部署前端 Pages。
+推荐流程是：先把代码上传到 GitHub，再在 Cloudflare Dashboard 中连接 GitHub 仓库部署。
 
-## 需要准备
-
-本机需要安装：
-
-- Node.js 18 或更高版本。
-- Git。
-- 可以访问 Cloudflare 账号的浏览器。
-
-首次使用 Wrangler 登录 Cloudflare：
-
-```powershell
-npx wrangler login
-```
-
-确认登录状态：
-
-```powershell
-npx wrangler whoami
-```
-
-## Cloudflare 变量与密钥
-
-管理员账号不通过 bootstrap 接口创建，也不提交到 GitHub。
-
-需要在 Cloudflare Worker 的变量与密钥中配置：
-
-- `ADMIN_USERNAME`：管理员用户名，普通变量。
-- `ADMIN_PASSWORD`：管理员密码，Secret。
-- `JWT_SECRET`：JWT 签名密钥，Secret。
-
-一键部署脚本会提示你输入这些值，并通过 Wrangler 写入 Cloudflare。
-
-## Windows 一键部署
+## 1. 上传代码到 GitHub
 
 在项目根目录执行：
 
 ```powershell
-.\scripts\deploy.ps1
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/你的用户名/cloudflare-webdav.git
+git push -u origin main
 ```
 
-常用参数：
-
-```powershell
-.\scripts\deploy.ps1 `
-  -WorkerName cloudflare-webdav `
-  -D1Name cloudflare-webdav `
-  -KVNamespaceName cloudflare-webdav-files `
-  -AdminPagesProject cloudflare-webdav-admin `
-  -UserPagesProject cloudflare-webdav-user
-```
-
-如果现在只想部署前端页面，不设置 Worker 密钥：
-
-```powershell
-.\scripts\deploy.ps1 -SkipWorker
-```
-
-脚本会执行：
-
-1. 检查 Wrangler 登录状态。
-2. 安装依赖，如果存在 `package.json`。
-3. 创建或复用 D1 数据库。
-4. 创建或复用 KV 命名空间。
-5. 如果存在 `wrangler.jsonc`，自动写入 D1/KV 绑定 ID。
-6. 如果存在 `migrations/`，执行 D1 迁移。
-7. 设置 `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`JWT_SECRET`。
-8. 如果存在 Worker 配置和入口文件，部署 Worker。
-9. 部署 `pages-admin/` 到 Cloudflare Pages。
-10. 部署 `pages-user/` 到 Cloudflare Pages。
-
-## Linux/macOS 一键部署
-
-在项目根目录执行：
-
-```bash
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
-
-可通过环境变量自定义名称：
-
-```bash
-WORKER_NAME=cloudflare-webdav \
-D1_NAME=cloudflare-webdav \
-KV_NAMESPACE_NAME=cloudflare-webdav-files \
-ADMIN_PAGES_PROJECT=cloudflare-webdav-admin \
-USER_PAGES_PROJECT=cloudflare-webdav-user \
-./scripts/deploy.sh
-```
-
-只部署前端：
-
-```bash
-SKIP_WORKER=1 ./scripts/deploy.sh
-```
-
-## 手动部署前端 Pages
-
-管理员端：
-
-```powershell
-npx wrangler pages project create cloudflare-webdav-admin
-npx wrangler pages deploy .\pages-admin --project-name cloudflare-webdav-admin
-```
-
-用户端：
-
-```powershell
-npx wrangler pages project create cloudflare-webdav-user
-npx wrangler pages deploy .\pages-user --project-name cloudflare-webdav-user
-```
-
-如果 Pages 和 Worker 不在同一个域名下，需要在 Worker 中允许 Pages 域名的 CORS，或者通过 Cloudflare 自定义域名/路由让前端和 API 同源。
-
-## 手动部署 Worker
-
-Worker 后端实现完成后，手动部署流程如下。
-
-创建 D1：
-
-```powershell
-npx wrangler d1 create cloudflare-webdav
-```
-
-创建 KV：
-
-```powershell
-npx wrangler kv namespace create cloudflare-webdav-files
-```
-
-把返回的 D1 `database_id` 和 KV `id` 填入 `wrangler.jsonc`。
-
-设置密钥：
-
-```powershell
-npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put JWT_SECRET
-```
-
-`ADMIN_USERNAME` 可以作为普通变量写入 `wrangler.jsonc`，也可以在 Cloudflare 后台配置。
-
-执行迁移：
-
-```powershell
-npx wrangler d1 migrations apply cloudflare-webdav --remote
-```
-
-部署 Worker：
-
-```powershell
-npx wrangler deploy
-```
-
-## GitHub Actions 自动部署
-
-如果后续要用 GitHub 自动部署，需要在 GitHub 仓库设置 Secrets：
-
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
-管理员账号、管理员密码和 `JWT_SECRET` 仍建议在 Cloudflare Worker 的变量与密钥中配置，不放进 GitHub Actions。
-
-## 常见问题
-
-### `git push` 提示 fetch first
-
-先同步远端：
+如果推送时提示远端已有内容：
 
 ```powershell
 git pull --rebase origin main
 git push
 ```
 
-### Wrangler 未登录
+## 2. 创建 D1 数据库
 
-执行：
+打开 Cloudflare Dashboard：
 
-```powershell
-npx wrangler login
+```text
+https://dash.cloudflare.com/
 ```
 
-### 找不到 Worker 配置
+进入：
 
-如果脚本提示没有 `wrangler.jsonc`，说明当前只有前端和文档，Worker 后端还没有实现。脚本会跳过 Worker 部署，继续部署 Pages 前端。
+```text
+Workers & Pages -> D1 SQL Database -> Create database
+```
 
-### Pages 能打开但 API 请求失败
+数据库名称建议填写：
+
+```text
+cloudflare-webdav
+```
+
+创建完成后，记录数据库 ID。
+
+## 3. 创建 KV 命名空间
+
+进入：
+
+```text
+Workers & Pages -> KV -> Create namespace
+```
+
+命名空间名称建议填写：
+
+```text
+cloudflare-webdav-files
+```
+
+创建完成后，记录 KV Namespace ID。
+
+## 4. 部署 Worker
+
+进入：
+
+```text
+Workers & Pages -> Create application -> Worker
+```
+
+Worker 名称建议填写：
+
+```text
+cloudflare-webdav
+```
+
+如果 Cloudflare 页面提供 GitHub 导入入口，可以选择你的 GitHub 仓库。如果使用在线编辑器，则需要把 Worker 后端代码复制进去。
+
+## 5. 绑定 D1 和 KV
+
+进入 Worker 项目：
+
+```text
+Settings -> Bindings
+```
+
+添加 D1 绑定：
+
+```text
+Variable name: DB
+D1 database: cloudflare-webdav
+```
+
+添加 KV 绑定：
+
+```text
+Variable name: FILES
+KV namespace: cloudflare-webdav-files
+```
+
+如果后端代码使用了不同的绑定名称，请以代码中的名称为准。
+
+## 6. 添加管理员变量与密钥
+
+进入 Worker 项目：
+
+```text
+Settings -> Variables and Secrets
+```
+
+添加普通变量：
+
+```text
+ADMIN_USERNAME=你的管理员用户名
+```
+
+添加 Secret：
+
+```text
+ADMIN_PASSWORD=你的管理员密码
+JWT_SECRET=随机长字符串
+```
+
+`JWT_SECRET` 建议使用随机长字符串，不要提交到 GitHub。
+
+## 7. 部署管理员后台 Pages
+
+进入：
+
+```text
+Workers & Pages -> Create application -> Pages -> Connect to Git
+```
+
+选择 GitHub 仓库后填写：
+
+```text
+Project name: cloudflare-webdav-admin
+Production branch: main
+Root directory: pages-admin
+Build command: 留空
+Build output directory: .
+```
+
+保存并部署。
+
+## 8. 部署用户端 Pages
+
+再次进入：
+
+```text
+Workers & Pages -> Create application -> Pages -> Connect to Git
+```
+
+选择同一个 GitHub 仓库后填写：
+
+```text
+Project name: cloudflare-webdav-user
+Production branch: main
+Root directory: pages-user
+Build command: 留空
+Build output directory: .
+```
+
+保存并部署。
+
+## 9. 配置前端访问 Worker
+
+用户端页面需要访问 Worker 的 `/api/*` 和 `/dav/*` 接口。
+
+推荐选择一种方式：
+
+- 给 Worker 和 Pages 配置同一个自定义域名下的路由。
+- 在 Worker 中允许 Pages 域名跨域访问。
+- 把前端 API 地址配置为你的 Worker 地址。
+
+## 10. GitHub 自动部署
+
+使用 Cloudflare Pages 的 GitHub 连接部署后，以后只要推送到 GitHub 的 `main` 分支，Cloudflare Pages 会自动重新部署前端。
+
+如果你还想用 GitHub Actions 部署 Worker，需要在 GitHub 仓库添加：
+
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+管理员密码和 `JWT_SECRET` 仍建议只放在 Cloudflare Worker 的变量与密钥中。
+
+## 常见问题
+
+### 没有 R2 可以部署吗？
+
+可以。本项目使用 D1 + KV，不依赖 R2。
+
+### D1 能直接存文件吗？
+
+不建议。D1 用来存用户、目录、文件名、大小、时间等元数据；KV 用来存文件正文。
+
+### Pages 能打开，但登录失败怎么办？
 
 通常是以下原因：
 
-- Worker 后端尚未部署。
-- Pages 和 Worker 不同源，Worker 没有配置 CORS。
-- Pages 访问的 API 路径不是同一个域名下的 `/api/admin/*` 或 `/dav/*`。
-
+- Worker 没有部署成功。
+- D1 或 KV 绑定名称不正确。
+- `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`JWT_SECRET` 没有配置。
+- Pages 和 Worker 不同源，且 Worker 没有允许跨域。
