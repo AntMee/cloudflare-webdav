@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "prepare:cloudflare": "node .github/workflows/prepare-cloudflare.mjs",
+    "deploy": "npm run prepare:cloudflare && wrangler d1 migrations apply webdav_db --remote && wrangler deploy",
     "check": "node --check src/index.js"
   },
   "devDependencies": {

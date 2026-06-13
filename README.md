@@ -134,6 +134,16 @@ Pages: cloudflare-webdav-admin
 Pages: cloudflare-webdav-user
 ```
 
+如果你是在 Cloudflare Dashboard 的 Workers 构建页面部署，部署命令不要填写 `npx wrangler deploy`。
+
+请填写：
+
+```text
+npm run deploy
+```
+
+原因是 `npm run deploy` 会先自动创建或复用 D1/KV，并把真实 ID 写入 `wrangler.jsonc`，然后才执行 Wrangler 部署。直接运行 `npx wrangler deploy` 会跳过这一步，导致仍然使用 `replace-with-your-kv-namespace-id` 这样的占位符。
+
 ### 6. 添加管理员变量与密钥
 
 管理员账号仍然建议由用户自己在 Cloudflare Worker 的变量与密钥中配置。
@@ -430,7 +440,7 @@ jobs:
 
       - name: Deploy Worker
         if: ${{ hashFiles('wrangler.jsonc') != '' }}
-        run: npx wrangler deploy
+        run: npm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

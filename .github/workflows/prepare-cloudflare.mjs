@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const d1Name = mustGetEnv("D1_NAME");
-const kvName = mustGetEnv("KV_NAME");
+const d1Name = process.env.D1_NAME || "webdav_db";
+const kvName = process.env.KV_NAME || "webdav_files";
 
 const d1Id = ensureD1(d1Name);
 const kvId = ensureKV(kvName);
@@ -73,10 +73,4 @@ function runWrangler(args) {
     stdio: ["ignore", "pipe", "inherit"],
     env: process.env,
   }).trim();
-}
-
-function mustGetEnv(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }
