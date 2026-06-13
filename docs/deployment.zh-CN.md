@@ -47,10 +47,10 @@ Workers & Pages -> D1 SQL Database -> Create database
 数据库名称建议填写：
 
 ```text
-cloudflare-webdav
+webdav_db
 ```
 
-创建完成后，记录数据库 ID。
+这个 D1 数据库由用户自己在 Cloudflare 中创建。创建完成后，记录数据库 ID。
 
 ## 3. 创建 KV 命名空间
 
@@ -63,10 +63,10 @@ Workers & Pages -> KV -> Create namespace
 命名空间名称建议填写：
 
 ```text
-cloudflare-webdav-files
+webdav_files
 ```
 
-创建完成后，记录 KV Namespace ID。
+这个 KV 命名空间由用户自己在 Cloudflare 中创建。创建完成后，记录 KV Namespace ID。
 
 ## 4. 部署 Worker
 
@@ -96,15 +96,19 @@ Settings -> Bindings
 
 ```text
 Variable name: DB
-D1 database: cloudflare-webdav
+D1 database: webdav_db
 ```
+
+这里的变量名称必须填写 `DB`，因为 Worker 代码会通过 `env.DB` 访问 D1 数据库。
 
 添加 KV 绑定：
 
 ```text
-Variable name: FILES
-KV namespace: cloudflare-webdav-files
+Variable name: KV
+KV namespace: webdav_files
 ```
+
+这里的变量名称必须填写 `KV`，因为 Worker 代码会通过 `env.KV` 访问 KV 命名空间。
 
 如果后端代码使用了不同的绑定名称，请以代码中的名称为准。
 
