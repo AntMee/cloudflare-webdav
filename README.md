@@ -49,3 +49,15 @@ It uses the WebDAV `/dav/` endpoint for login, directory browsing, upload, downl
 ## Why Not Store Files Directly In D1
 
 D1 is better for structured data and is not suitable for 20 MB file bodies. KV can store values large enough for this use case, so the design stores metadata in D1 and file contents in KV.
+<<<<<<< HEAD
+=======
+## Admin Frontend
+
+The static admin frontend is in `pages-admin/`:
+
+- `pages-admin/index.html`
+- `pages-admin/styles.css`
+- `pages-admin/app.js`
+
+It calls Worker APIs such as `/api/admin/login` and `/api/admin/users`. Deploy this directory to Cloudflare Pages after the Worker API is implemented.
+>>>>>>> 7239ade (feat: add admin frontend)

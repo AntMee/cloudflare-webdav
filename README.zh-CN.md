@@ -30,3 +30,15 @@
 ## 为什么不用 D1 直接存文件
 
 D1 更适合结构化数据，不适合直接存 20 MB 文件正文。KV 单个 value 最大可覆盖 20 MB 配置文件场景，因此采用 D1 存元数据、KV 存文件内容的方式。
+<<<<<<< HEAD
+=======
+## 管理后台前端
+
+静态管理后台位于 `pages-admin/`：
+
+- `pages-admin/index.html`
+- `pages-admin/styles.css`
+- `pages-admin/app.js`
+
+页面会调用 `/api/admin/login` 和 `/api/admin/users` 等 Worker API。后端 Worker 实现完成后，可以将该目录部署到 Cloudflare Pages。
+>>>>>>> 7239ade (feat: add admin frontend)

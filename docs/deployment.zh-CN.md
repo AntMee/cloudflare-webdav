@@ -93,6 +93,23 @@ D1 和 KV 建议仍然先用本地脚本创建一次，然后把资源 ID 固定
 
 管理员账号和 `JWT_SECRET` 仍然在 Cloudflare Worker 的变量与密钥中设置，不放进 GitHub Actions。
 
+## Pages 管理后台部署
+
+管理后台前端目录是：
+
+```text
+pages-admin
+```
+
+后端 Worker API 实现完成后，可以用 Wrangler 部署 Pages：
+
+```powershell
+npx wrangler pages project create cloudflare-webdav-admin
+npx wrangler pages deploy .\pages-admin --project-name cloudflare-webdav-admin
+```
+
+如果 Pages 和 Worker 不在同一个域名下，需要在 Worker 中允许 Pages 域名的 CORS，或者在 Cloudflare 中用自定义域名/路由让前端和 API 同源。
+
 ## 为什么不能完全零配置
 
 Cloudflare 部署至少需要这些账户级操作：
@@ -113,3 +130,9 @@ Cloudflare 部署至少需要这些账户级操作：
 - `.github/workflows/deploy.yml`：GitHub Actions 自动部署。
 - `docs/deployment.zh-CN.md`：完整中文部署说明。
 - 管理员认证读取 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`，JWT 签名读取 `JWT_SECRET`，不再实现 bootstrap 创建管理员接口。
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> 7239ade (feat: add admin frontend)
