@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloudflare-webdav",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-14",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "MAX_FILE_BYTES": "20971520",
+    "SESSION_TTL_SECONDS": "43200"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webdav_db",
+      "database_id": "replace-with-your-d1-database-id",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "replace-with-your-kv-namespace-id"
+    }
+  ]
+}

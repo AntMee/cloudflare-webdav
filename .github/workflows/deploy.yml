@@ -1,0 +1,62 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  WORKER_NAME: cloudflare-webdav
+  D1_NAME: webdav_db
+  KV_NAME: webdav_files
+  ADMIN_PAGES_PROJECT: cloudflare-webdav-admin
+  USER_PAGES_PROJECT: cloudflare-webdav-user
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create D1 and KV if missing
+        run: node .github/workflows/prepare-cloudflare.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_NAME: ${{ env.D1_NAME }}
+          KV_NAME: ${{ env.KV_NAME }}
+
+      - name: Apply D1 migrations
+        run: npx wrangler d1 migrations apply "$D1_NAME" --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker
+        run: npx wrangler deploy --name "$WORKER_NAME"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy admin Pages
+        run: npx wrangler pages deploy ./pages-admin --project-name "$ADMIN_PAGES_PROJECT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy user Pages
+        run: npx wrangler pages deploy ./pages-user --project-name "$USER_PAGES_PROJECT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

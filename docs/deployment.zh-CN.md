@@ -1,6 +1,6 @@
 # Cloudflare Dashboard 部署教程
 
-本文档说明如何在 `https://dash.cloudflare.com/` 中部署 Cloudflare WebDAV。
+本文档说明如何部署 Cloudflare WebDAV。推荐使用 GitHub Actions 自动创建 D1/KV 并部署，也可以在 `https://dash.cloudflare.com/` 中手动绑定。
 
 项目分为三部分：
 
@@ -8,7 +8,7 @@
 - **Pages 管理员后台**：`pages-admin/`。
 - **Pages 用户端文件管理器**：`pages-user/`。
 
-推荐流程是：先把代码上传到 GitHub，再在 Cloudflare Dashboard 中连接 GitHub 仓库部署。
+推荐流程是：先把代码上传到 GitHub，再配置 Cloudflare API Token。之后 GitHub Actions 会自动创建或复用 D1 数据库和 KV 命名空间，并完成绑定部署。
 
 ## 1. 上传代码到 GitHub
 
@@ -30,7 +30,86 @@ git pull --rebase origin main
 git push
 ```
 
-## 2. 创建 D1 数据库
+## 2. 配置 GitHub Secrets
+
+在 Cloudflare Dashboard 创建 API Token：
+
+```text
+https://dash.cloudflare.com/
+My Profile -> API Tokens -> Create Token
+```
+
+建议权限：
+
+```text
+Account - Cloudflare Pages - Edit
+Account - Workers Scripts - Edit
+Account - Workers KV Storage - Edit
+Account - D1 - Edit
+Account - Account Settings - Read
+Zone - Zone - Read
+```
+
+进入 GitHub 仓库：
+
+```text
+Settings -> Secrets and variables -> Actions -> New repository secret
+```
+
+添加：
+
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+## 3. 自动创建 D1/KV 并部署
+
+仓库包含：
+
+```text
+.github/workflows/deploy.yml
+.github/workflows/prepare-cloudflare.mjs
+```
+
+推送到 `main` 分支后，GitHub Actions 会自动：
+
+1. 创建或复用 D1 数据库 `webdav_db`。
+2. 创建或复用 KV 命名空间 `webdav_files`。
+3. 把真实 D1/KV ID 写入 `wrangler.jsonc`。
+4. 执行 D1 迁移。
+5. 部署 Worker。
+6. 部署管理员 Pages。
+7. 部署用户端 Pages。
+
+也可以手动运行：
+
+```text
+GitHub -> Actions -> Deploy to Cloudflare -> Run workflow
+```
+
+## 4. 添加管理员变量与密钥
+
+自动部署不会把管理员密码写入 GitHub。请进入 Cloudflare：
+
+```text
+Workers & Pages -> cloudflare-webdav -> Settings -> Variables and Secrets
+```
+
+添加普通变量：
+
+```text
+ADMIN_USERNAME=你的管理员用户名
+```
+
+添加 Secret：
+
+```text
+ADMIN_PASSWORD=你的管理员密码
+JWT_SECRET=随机长字符串
+```
+
+## 5. Cloudflare Dashboard 手动创建 D1 数据库
 
 打开 Cloudflare Dashboard：
 
@@ -52,7 +131,7 @@ webdav_db
 
 这个 D1 数据库由用户自己在 Cloudflare 中创建。创建完成后，记录数据库 ID。
 
-## 3. 创建 KV 命名空间
+## 6. Cloudflare Dashboard 手动创建 KV 命名空间
 
 进入：
 
@@ -68,7 +147,7 @@ webdav_files
 
 这个 KV 命名空间由用户自己在 Cloudflare 中创建。创建完成后，记录 KV Namespace ID。
 
-## 4. 部署 Worker
+## 7. Cloudflare Dashboard 手动部署 Worker
 
 进入：
 
@@ -84,7 +163,7 @@ cloudflare-webdav
 
 如果 Cloudflare 页面提供 GitHub 导入入口，可以选择你的 GitHub 仓库。如果使用在线编辑器，则需要把 Worker 后端代码复制进去。
 
-## 5. 绑定 D1 和 KV
+## 8. Cloudflare Dashboard 手动绑定 D1 和 KV
 
 进入 Worker 项目：
 
@@ -112,7 +191,7 @@ KV namespace: webdav_files
 
 如果后端代码使用了不同的绑定名称，请以代码中的名称为准。
 
-## 6. 添加管理员变量与密钥
+## 9. Cloudflare Dashboard 手动添加管理员变量与密钥
 
 进入 Worker 项目：
 
@@ -135,7 +214,7 @@ JWT_SECRET=随机长字符串
 
 `JWT_SECRET` 建议使用随机长字符串，不要提交到 GitHub。
 
-## 7. 部署管理员后台 Pages
+## 10. 手动部署管理员后台 Pages
 
 进入：
 
@@ -155,7 +234,7 @@ Build output directory: .
 
 保存并部署。
 
-## 8. 部署用户端 Pages
+## 11. 手动部署用户端 Pages
 
 再次进入：
 
@@ -175,7 +254,7 @@ Build output directory: .
 
 保存并部署。
 
-## 9. 配置前端访问 Worker
+## 12. 配置前端访问 Worker
 
 用户端页面需要访问 Worker 的 `/api/*` 和 `/dav/*` 接口。
 
@@ -185,7 +264,7 @@ Build output directory: .
 - 在 Worker 中允许 Pages 域名跨域访问。
 - 把前端 API 地址配置为你的 Worker 地址。
 
-## 10. GitHub 自动部署
+## 13. GitHub 自动部署
 
 使用 Cloudflare Pages 的 GitHub 连接部署后，以后只要推送到 GitHub 的 `main` 分支，Cloudflare Pages 会自动重新部署前端。
 
