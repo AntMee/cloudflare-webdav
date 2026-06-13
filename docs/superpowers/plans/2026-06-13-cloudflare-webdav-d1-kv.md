@@ -1321,29 +1321,29 @@ Create `cloudflare-webdav/pages-admin/index.html`:
     <main>
       <h1>WebDAV Admin</h1>
       <section id="login">
-        <h2>管理员登录</h2>
-        <label>用户名</label>
+        <h2>绠＄悊鍛樼櫥褰?/h2>
+        <label>鐢ㄦ埛鍚?/label>
         <input id="login-username" autocomplete="username" />
-        <label>密码</label>
+        <label>瀵嗙爜</label>
         <input id="login-password" type="password" autocomplete="current-password" />
-        <p><button id="login-button">登录</button></p>
+        <p><button id="login-button">鐧诲綍</button></p>
       </section>
 
       <section id="users" class="hidden">
-        <h2>用户管理</h2>
+        <h2>鐢ㄦ埛绠＄悊</h2>
         <div class="row">
-          <label>用户名 <input id="new-username" /></label>
-          <label>密码 <input id="new-password" type="password" /></label>
-          <label>角色
+          <label>鐢ㄦ埛鍚?<input id="new-username" /></label>
+          <label>瀵嗙爜 <input id="new-password" type="password" /></label>
+          <label>瑙掕壊
             <select id="new-role">
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
+              <option value="user">鏅€氱敤鎴?/option>
+              <option value="admin">绠＄悊鍛?/option>
             </select>
           </label>
-          <button id="create-user">新增用户</button>
+          <button id="create-user">鏂板鐢ㄦ埛</button>
         </div>
         <table>
-          <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>鐢ㄦ埛鍚?/th><th>瑙掕壊</th><th>鐘舵€?/th><th>鎿嶄綔</th></tr></thead>
           <tbody id="user-list"></tbody>
         </table>
       </section>
@@ -1380,7 +1380,7 @@ async function login() {
     }),
   });
   const body = await response.json();
-  if (!response.ok) return setMessage(body.error || "登录失败");
+  if (!response.ok) return setMessage(body.error || "鐧诲綍澶辫触");
   token = body.token;
   localStorage.setItem("adminToken", token);
   await showUsers();
@@ -1395,15 +1395,15 @@ async function showUsers() {
 async function loadUsers() {
   const response = await api("/api/admin/users");
   const body = await response.json();
-  if (!response.ok) return setMessage(body.error || "加载失败");
+  if (!response.ok) return setMessage(body.error || "鍔犺浇澶辫触");
   const rows = body.users.map((user) => `
     <tr>
       <td>${escapeHtml(user.username)}</td>
       <td>${escapeHtml(user.role)}</td>
-      <td>${user.enabled ? "启用" : "禁用"}</td>
+      <td>${user.enabled ? "鍚敤" : "绂佺敤"}</td>
       <td>
-        <button data-enable="${user.id}" data-value="${!user.enabled}">${user.enabled ? "禁用" : "启用"}</button>
-        <button data-reset="${user.id}">重置密码</button>
+        <button data-enable="${user.id}" data-value="${!user.enabled}">${user.enabled ? "绂佺敤" : "鍚敤"}</button>
+        <button data-reset="${user.id}">閲嶇疆瀵嗙爜</button>
       </td>
     </tr>
   `).join("");
@@ -1422,8 +1422,8 @@ async function createUser() {
     }),
   });
   const body = await response.json();
-  if (!response.ok) return setMessage(body.error || "创建失败");
-  setMessage(`已创建用户 ${body.username}`);
+  if (!response.ok) return setMessage(body.error || "鍒涘缓澶辫触");
+  setMessage(`宸插垱寤虹敤鎴?${body.username}`);
   await loadUsers();
 }
 
@@ -1433,19 +1433,19 @@ async function toggleUser(event) {
     method: "PATCH",
     body: JSON.stringify({ enabled: button.dataset.value === "true" }),
   });
-  if (!response.ok) return setMessage("更新状态失败");
+  if (!response.ok) return setMessage("鏇存柊鐘舵€佸け璐?);
   await loadUsers();
 }
 
 async function resetPassword(event) {
-  const password = prompt("输入新密码，至少 8 位");
+  const password = prompt("杈撳叆鏂板瘑鐮侊紝鑷冲皯 8 浣?);
   if (!password) return;
   const response = await api(`/api/admin/users/${event.currentTarget.dataset.reset}/password`, {
     method: "PATCH",
     body: JSON.stringify({ password }),
   });
-  if (!response.ok) return setMessage("重置密码失败");
-  setMessage("密码已重置");
+  if (!response.ok) return setMessage("閲嶇疆瀵嗙爜澶辫触");
+  setMessage("瀵嗙爜宸查噸缃?);
 }
 
 function api(path, options = {}) {
@@ -1683,3 +1683,16 @@ Expected: `MKCOL` returns `201`, `PUT` returns `201`, `PROPFIND` returns `207`, 
 - The admin UI is intentionally scoped to user management, matching the first-version design.
 - Current workspace is not a git repository, so commit steps are omitted from task checklists even though the writing-plans skill normally recommends frequent commits.
 
+## Revision Note
+
+The administrator bootstrap task is superseded by the later product decision: the administrator account is configured by the user in Cloudflare Worker variables and secrets.
+
+Do not implement `/api/bootstrap/admin` or `BOOTSTRAP_TOKEN`.
+
+Use these bindings instead:
+
+- `ADMIN_USERNAME`: administrator username.
+- `ADMIN_PASSWORD`: administrator password, stored as a Cloudflare secret.
+- `JWT_SECRET`: JWT signing secret, stored as a Cloudflare secret.
+
+The admin login endpoint should validate against those bindings, sign a JWT with `JWT_SECRET` after successful login, and optionally store the JWT hash and expiration time in D1 for revocation.

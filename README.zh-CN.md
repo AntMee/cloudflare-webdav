@@ -1,10 +1,11 @@
-﻿# Cloudflare WebDAV
+# Cloudflare WebDAV
 
 这是一个计划中的 Cloudflare WebDAV 项目，目标是在不使用 R2 的情况下，通过 **Workers + D1 + KV + Pages** 实现一个适合配置文件存储的 WebDAV 服务。
 
 ## 设计目标
 
 - 管理员可以新增、禁用用户和重置密码。
+- 管理员账号通过 Cloudflare 变量与密钥配置，JWT 会话使用 `JWT_SECRET` 签名。
 - 普通用户通过 WebDAV 客户端上传、下载、删除配置文件。
 - 文件内容存储在 Workers KV，单文件限制为 20 MB。
 - 用户、权限、目录和文件元数据存储在 D1。
@@ -17,6 +18,7 @@
 - 中文设计文档：`docs/superpowers/specs/2026-06-13-cloudflare-webdav-d1-kv-design.zh-CN.md`
 - 英文实现计划：`docs/superpowers/plans/2026-06-13-cloudflare-webdav-d1-kv.md`
 - 中文实现计划：`docs/superpowers/plans/2026-06-13-cloudflare-webdav-d1-kv.zh-CN.md`
+- 简化部署方案：`docs/deployment.zh-CN.md`
 
 ## 推荐架构
 

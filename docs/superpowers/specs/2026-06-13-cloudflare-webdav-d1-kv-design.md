@@ -1,4 +1,4 @@
-﻿# Cloudflare WebDAV D1 + KV Design
+# Cloudflare WebDAV D1 + KV Design
 
 ## Goal
 
@@ -59,7 +59,7 @@ The unique key for `nodes` is `(owner_user_id, path)`. Directory paths end with 
 
 WebDAV clients use HTTP Basic Auth. The Worker verifies username and password against D1. Passwords are stored as salted hashes, never plaintext.
 
-The admin UI uses a login endpoint that returns a session token. The token itself is only returned once; D1 stores a hash of the token.
+The administrator is configured by the user in Cloudflare Worker variables and secrets: `ADMIN_USERNAME` stores the admin username, `ADMIN_PASSWORD` is stored as a secret, and `JWT_SECRET` is stored as a secret for session signing. The admin UI uses a login endpoint that returns a signed JWT session token. D1 may optionally store a token hash and expiration time for session revocation.
 
 Normal users can only access their own namespace. The external WebDAV path `/` maps to that user's private root. An admin can manage users and metadata through the UI, but WebDAV file operations remain scoped to the authenticated user unless an explicit admin file-management route is added later.
 
@@ -127,9 +127,9 @@ Important cases:
 
 ## Security
 
-Secrets are not stored in source code. Initial admin bootstrap credentials are set through Cloudflare secrets or a one-time bootstrap flow.
+Secrets are not stored in source code. The administrator username, administrator password, and `JWT_SECRET` are configured by the user in Cloudflare variables and secrets. No bootstrap admin endpoint is required, and admin credentials are not committed to GitHub.
 
-Password verification uses Web Crypto APIs available in Workers. Token comparisons use timing-safe comparison logic. Logs must not include passwords, session tokens, or Basic Auth headers.
+Password verification uses Web Crypto APIs available in Workers. JWTs are signed and verified with `JWT_SECRET`. Token comparisons use timing-safe comparison logic. Logs must not include passwords, JWTs, session tokens, or Basic Auth headers.
 
 ## Testing
 
@@ -167,7 +167,7 @@ Deployment steps:
 1. Create D1 database.
 2. Create KV namespace.
 3. Apply D1 schema migrations.
-4. Set admin bootstrap secret.
+4. Set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `JWT_SECRET` in Cloudflare variables and secrets.
 5. Deploy Worker.
 6. Deploy Pages admin UI.
 
@@ -180,4 +180,3 @@ Deployment steps:
 - File version history.
 - High-frequency concurrent writes to the same file.
 - Large file support beyond 20 MB.
-
