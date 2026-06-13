@@ -117,13 +117,13 @@ async function handleAdmin(request, env, url) {
 
 async function handleWebDav(request, env, url) {
   const auth = parseBasicAuth(request.headers.get("authorization"));
-  if (!auth) return unauthorized();
+  if (!auth) return unauthorized(request);
 
   const user = await env.DB.prepare("SELECT * FROM users WHERE username = ? AND enabled = 1")
     .bind(auth.username)
     .first();
   if (!user || !(await verifyPassword(auth.password, user.password_hash))) {
-    return unauthorized();
+    return unauthorized(request);
   }
 
   await ensureRoot(env.DB, user.id);
@@ -391,7 +391,10 @@ function davResponse(node, origin) {
   return `<D:response><D:href>${escapeXml(href)}</D:href><D:propstat><D:prop>${collection}<D:getcontentlength>${node.size || 0}</D:getcontentlength><D:getlastmodified>${new Date(node.updated_at).toUTCString()}</D:getlastmodified></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
 }
 
-function unauthorized() {
+function unauthorized(request) {
+  if (request.headers.get("x-webdav-web") === "1") {
+    return text("Unauthorized", 401);
+  }
   return text("Unauthorized", 401, { "www-authenticate": 'Basic realm="Cloudflare WebDAV"' });
 }
 
@@ -429,7 +432,7 @@ function corsHeaders(request) {
   return {
     "access-control-allow-origin": origin,
     "access-control-allow-methods": "GET, HEAD, POST, PATCH, PUT, DELETE, MKCOL, PROPFIND, OPTIONS",
-    "access-control-allow-headers": "authorization, content-type, depth",
+    "access-control-allow-headers": "authorization, content-type, depth, x-webdav-web",
     "access-control-expose-headers": "etag, dav, content-length",
   };
 }

@@ -242,6 +242,7 @@ async function handleUpload() {
         headers: {
           authorization: state.userAuth,
           "content-type": file.type || "application/octet-stream",
+          "x-webdav-web": "1",
         },
         body: file,
       });
@@ -265,7 +266,7 @@ async function handleCreateFolder(event) {
   try {
     const response = await fetch(davUrl(ensureDirectory(joinPath(state.currentPath, name))), {
       method: "MKCOL",
-      headers: { authorization: state.userAuth },
+      headers: { authorization: state.userAuth, "x-webdav-web": "1" },
     });
     if (!response.ok) throw new Error(`创建文件夹失败：${response.status}`);
     elements.folderForm.reset();
@@ -279,7 +280,7 @@ async function handleCreateFolder(event) {
 async function downloadFile(file) {
   try {
     const response = await fetch(davUrl(file.path), {
-      headers: { authorization: state.userAuth },
+      headers: { authorization: state.userAuth, "x-webdav-web": "1" },
     });
     if (!response.ok) throw new Error(`下载失败：${response.status}`);
     const blob = await response.blob();
@@ -302,7 +303,7 @@ async function deleteEntry(file) {
   try {
     const response = await fetch(davUrl(file.path), {
       method: "DELETE",
-      headers: { authorization: state.userAuth },
+      headers: { authorization: state.userAuth, "x-webdav-web": "1" },
     });
     if (!response.ok) throw new Error(`删除失败：${response.status}`);
     await loadDirectory(state.currentPath);
@@ -318,6 +319,7 @@ async function propfind(path, depth) {
     headers: {
       authorization: state.userAuth,
       depth: String(depth),
+      "x-webdav-web": "1",
     },
   });
 
