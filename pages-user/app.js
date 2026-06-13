@@ -1,18 +1,25 @@
 const state = {
-  auth: sessionStorage.getItem("webdavUserAuth") || "",
+  adminToken: sessionStorage.getItem("webdavAdminToken") || "",
+  userAuth: sessionStorage.getItem("webdavUserAuth") || "",
   username: sessionStorage.getItem("webdavUsername") || "",
   currentPath: "/",
   files: [],
-  preview: false,
+  users: [],
 };
 
 const elements = {
   loginView: document.querySelector("#login-view"),
-  filesView: document.querySelector("#files-view"),
   loginForm: document.querySelector("#login-form"),
-  previewFiles: document.querySelector("#preview-files"),
+  adminView: document.querySelector("#admin-view"),
+  filesView: document.querySelector("#files-view"),
+  createUserForm: document.querySelector("#create-user-form"),
+  refreshUsers: document.querySelector("#refresh-users"),
+  adminLogoutButton: document.querySelector("#admin-logout-button"),
+  userSearch: document.querySelector("#user-search"),
+  userList: document.querySelector("#user-list"),
+  userEmptyState: document.querySelector("#user-empty-state"),
   refreshFiles: document.querySelector("#refresh-files"),
-  logoutButton: document.querySelector("#logout-button"),
+  userLogoutButton: document.querySelector("#user-logout-button"),
   fileInput: document.querySelector("#file-input"),
   folderForm: document.querySelector("#folder-form"),
   folderName: document.querySelector("#folder-name"),
@@ -24,16 +31,20 @@ const elements = {
 };
 
 elements.loginForm.addEventListener("submit", handleLogin);
-elements.previewFiles.addEventListener("click", showPreview);
+elements.createUserForm.addEventListener("submit", handleCreateUser);
+elements.refreshUsers.addEventListener("click", loadUsers);
+elements.adminLogoutButton.addEventListener("click", logout);
+elements.userSearch.addEventListener("input", renderUsers);
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
-elements.logoutButton.addEventListener("click", logout);
+elements.userLogoutButton.addEventListener("click", logout);
 elements.fileInput.addEventListener("change", handleUpload);
 elements.folderForm.addEventListener("submit", handleCreateFolder);
 elements.fileSearch.addEventListener("input", renderFiles);
 
-if (new URLSearchParams(window.location.search).get("preview") === "1") {
-  showPreview();
-} else if (state.auth) {
+if (state.adminToken) {
+  showAdminView();
+  loadUsers();
+} else if (state.userAuth) {
   showFilesView();
   loadDirectory("/");
 }
@@ -49,40 +60,166 @@ async function handleLogin(event) {
     return;
   }
 
-  state.auth = `Basic ${btoa(`${username}:${password}`)}`;
+  const adminLoggedIn = await tryAdminLogin(username, password);
+  if (adminLoggedIn) return;
+
+  await tryUserLogin(username, password);
+}
+
+async function tryAdminLogin(username, password) {
+  const response = await fetch("/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) return false;
+
+  const body = await response.json();
+  state.adminToken = body.token;
+  sessionStorage.setItem("webdavAdminToken", state.adminToken);
+  sessionStorage.removeItem("webdavUserAuth");
+  sessionStorage.removeItem("webdavUsername");
+  elements.loginForm.reset();
+  showAdminView();
+  await loadUsers();
+  showToast("管理员登录成功");
+  return true;
+}
+
+async function tryUserLogin(username, password) {
+  state.userAuth = `Basic ${btoa(`${username}:${password}`)}`;
   state.username = username;
-  state.preview = false;
 
   try {
     await propfind("/", 0);
-    sessionStorage.setItem("webdavUserAuth", state.auth);
+    sessionStorage.setItem("webdavUserAuth", state.userAuth);
     sessionStorage.setItem("webdavUsername", state.username);
+    sessionStorage.removeItem("webdavAdminToken");
+    elements.loginForm.reset();
     showFilesView();
     await loadDirectory("/");
     showToast("登录成功");
   } catch (error) {
-    state.auth = "";
+    state.userAuth = "";
+    state.username = "";
+    showToast("用户名或密码无效", true);
+  }
+}
+
+async function loadUsers() {
+  try {
+    const body = await adminApi("/api/admin/users");
+    state.users = Array.isArray(body.users) ? body.users : [];
+    renderUsers();
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) logout();
     showToast(error.message, true);
   }
 }
 
-function showPreview() {
-  state.preview = true;
-  state.auth = "preview";
-  state.username = "alice";
-  state.currentPath = "/";
-  showFilesView();
-  seedPreviewFiles("/");
-  showToast("当前是用户端预览数据，未连接后端 WebDAV");
+async function handleCreateUser(event) {
+  event.preventDefault();
+  const form = new FormData(elements.createUserForm);
+  const username = String(form.get("username") || "").trim();
+  const password = String(form.get("password") || "");
+  const role = String(form.get("role") || "user");
+
+  if (!/^[a-zA-Z0-9_.-]{3,64}$/.test(username)) {
+    showToast("用户名只能包含字母、数字、下划线、点和短横线，长度 3-64 位", true);
+    return;
+  }
+
+  if (password.length < 8) {
+    showToast("密码至少需要 8 位", true);
+    return;
+  }
+
+  try {
+    await adminApi("/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({ username, password, role }),
+    });
+    elements.createUserForm.reset();
+    await loadUsers();
+    showToast("用户已创建");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function toggleUser(userId, enabled) {
+  try {
+    await adminApi(`/api/admin/users/${encodeURIComponent(userId)}/enabled`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    });
+    await loadUsers();
+    showToast(enabled ? "用户已启用" : "用户已禁用");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function resetPassword(userId) {
+  const password = window.prompt("请输入新密码，至少 8 位");
+  if (!password) return;
+  if (password.length < 8) {
+    showToast("密码至少需要 8 位", true);
+    return;
+  }
+
+  try {
+    await adminApi(`/api/admin/users/${encodeURIComponent(userId)}/password`, {
+      method: "PATCH",
+      body: JSON.stringify({ password }),
+    });
+    showToast("密码已重置");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+function renderUsers() {
+  const query = elements.userSearch.value.trim().toLowerCase();
+  const filtered = state.users.filter((user) => user.username.toLowerCase().includes(query));
+
+  elements.userList.innerHTML = filtered.map(userRow).join("");
+  elements.userEmptyState.classList.toggle("hidden", filtered.length > 0);
+
+  elements.userList.querySelectorAll("[data-toggle-user]").forEach((button) => {
+    button.addEventListener("click", () => toggleUser(button.dataset.toggleUser, button.dataset.enabled === "true"));
+  });
+  elements.userList.querySelectorAll("[data-reset-user]").forEach((button) => {
+    button.addEventListener("click", () => resetPassword(button.dataset.resetUser));
+  });
+}
+
+function userRow(user) {
+  const enabled = Boolean(user.enabled);
+  const role = user.role === "admin" ? "管理员" : "普通用户";
+  const updatedAt = user.updatedAt || user.updated_at || user.createdAt || user.created_at;
+
+  return `
+    <tr>
+      <td>${escapeHtml(user.username)}</td>
+      <td><span class="badge">${role}</span></td>
+      <td><span class="badge">${enabled ? "启用" : "禁用"}</span></td>
+      <td>${escapeHtml(formatDate(updatedAt))}</td>
+      <td>
+        <div class="row-actions">
+          <button class="table-action ${enabled ? "danger" : ""}" type="button" data-toggle-user="${escapeHtml(user.id)}" data-enabled="${String(!enabled)}">
+            ${enabled ? "禁用" : "启用"}
+          </button>
+          <button class="table-action" type="button" data-reset-user="${escapeHtml(user.id)}">重置密码</button>
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 async function loadDirectory(path) {
   state.currentPath = ensureDirectory(path);
-
-  if (state.preview) {
-    seedPreviewFiles(state.currentPath);
-    return;
-  }
 
   try {
     state.files = await propfind(state.currentPath, 1);
@@ -97,28 +234,13 @@ async function handleUpload() {
   elements.fileInput.value = "";
   if (files.length === 0) return;
 
-  if (state.preview) {
-    for (const file of files) {
-      state.files.push({
-        name: file.name,
-        path: joinPath(state.currentPath, file.name),
-        type: "file",
-        size: file.size,
-        modified: new Date().toISOString(),
-      });
-    }
-    renderFiles();
-    showToast(`已模拟上传 ${files.length} 个文件`);
-    return;
-  }
-
   try {
     for (const file of files) {
       const target = joinPath(state.currentPath, file.name);
       const response = await fetch(davUrl(target), {
         method: "PUT",
         headers: {
-          authorization: state.auth,
+          authorization: state.userAuth,
           "content-type": file.type || "application/octet-stream",
         },
         body: file,
@@ -140,26 +262,10 @@ async function handleCreateFolder(event) {
     return;
   }
 
-  const folderPath = ensureDirectory(joinPath(state.currentPath, name));
-
-  if (state.preview) {
-    state.files.push({
-      name,
-      path: folderPath,
-      type: "directory",
-      size: 0,
-      modified: new Date().toISOString(),
-    });
-    elements.folderForm.reset();
-    renderFiles();
-    showToast("已模拟创建文件夹");
-    return;
-  }
-
   try {
-    const response = await fetch(davUrl(folderPath), {
+    const response = await fetch(davUrl(ensureDirectory(joinPath(state.currentPath, name))), {
       method: "MKCOL",
-      headers: { authorization: state.auth },
+      headers: { authorization: state.userAuth },
     });
     if (!response.ok) throw new Error(`创建文件夹失败：${response.status}`);
     elements.folderForm.reset();
@@ -171,14 +277,9 @@ async function handleCreateFolder(event) {
 }
 
 async function downloadFile(file) {
-  if (state.preview) {
-    showToast("预览模式不下载真实文件");
-    return;
-  }
-
   try {
     const response = await fetch(davUrl(file.path), {
-      headers: { authorization: state.auth },
+      headers: { authorization: state.userAuth },
     });
     if (!response.ok) throw new Error(`下载失败：${response.status}`);
     const blob = await response.blob();
@@ -198,17 +299,10 @@ async function downloadFile(file) {
 async function deleteEntry(file) {
   if (!window.confirm(`确定删除 ${file.name}？`)) return;
 
-  if (state.preview) {
-    state.files = state.files.filter((item) => item.path !== file.path);
-    renderFiles();
-    showToast("已模拟删除");
-    return;
-  }
-
   try {
     const response = await fetch(davUrl(file.path), {
       method: "DELETE",
-      headers: { authorization: state.auth },
+      headers: { authorization: state.userAuth },
     });
     if (!response.ok) throw new Error(`删除失败：${response.status}`);
     await loadDirectory(state.currentPath);
@@ -222,7 +316,7 @@ async function propfind(path, depth) {
   const response = await fetch(davUrl(path), {
     method: "PROPFIND",
     headers: {
-      authorization: state.auth,
+      authorization: state.userAuth,
       depth: String(depth),
     },
   });
@@ -341,39 +435,51 @@ function renderBreadcrumbs() {
   });
 }
 
-function seedPreviewFiles(path) {
-  const datasets = {
-    "/": [
-      { name: "app-config", path: "/app-config/", type: "directory", size: 0, modified: new Date().toISOString() },
-      { name: "cloudflare.json", path: "/cloudflare.json", type: "file", size: 1842, modified: new Date().toISOString() },
-      { name: "tokens.env", path: "/tokens.env", type: "file", size: 612, modified: new Date(Date.now() - 86400000).toISOString() },
-    ],
-    "/app-config/": [
-      { name: "prod.yaml", path: "/app-config/prod.yaml", type: "file", size: 4096, modified: new Date().toISOString() },
-      { name: "staging.yaml", path: "/app-config/staging.yaml", type: "file", size: 3210, modified: new Date(Date.now() - 7200000).toISOString() },
-    ],
-  };
-  state.currentPath = ensureDirectory(path);
-  state.files = datasets[state.currentPath] || [];
-  renderFiles();
+async function adminApi(path, options = {}) {
+  const response = await fetch(path, {
+    method: options.method || "GET",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${state.adminToken}`,
+      ...(options.headers || {}),
+    },
+    body: options.body,
+  });
+  const text = await response.text();
+  const body = text ? safeJson(text) : {};
+  if (!response.ok) {
+    const error = new Error(body.error || body.message || `请求失败：${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return body;
+}
+
+function showAdminView() {
+  elements.loginView.classList.add("hidden");
+  elements.filesView.classList.add("hidden");
+  elements.adminView.classList.remove("hidden");
 }
 
 function showFilesView() {
   elements.loginView.classList.add("hidden");
+  elements.adminView.classList.add("hidden");
   elements.filesView.classList.remove("hidden");
 }
 
 function logout() {
-  state.auth = "";
+  state.adminToken = "";
+  state.userAuth = "";
   state.username = "";
-  state.preview = false;
   state.currentPath = "/";
   state.files = [];
+  state.users = [];
+  sessionStorage.removeItem("webdavAdminToken");
   sessionStorage.removeItem("webdavUserAuth");
   sessionStorage.removeItem("webdavUsername");
+  elements.adminView.classList.add("hidden");
   elements.filesView.classList.add("hidden");
   elements.loginView.classList.remove("hidden");
-  renderFiles();
 }
 
 function davUrl(path) {
@@ -421,6 +527,14 @@ function showToast(message, isError = false) {
   showToast.timer = window.setTimeout(() => {
     elements.toast.classList.add("hidden");
   }, 4200);
+}
+
+function safeJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
 }
 
 function formatBytes(bytes) {

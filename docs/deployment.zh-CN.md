@@ -272,7 +272,30 @@ Build output directory: .
 
 用户端页面需要访问 Worker 的 `/api/*` 和 `/dav/*` 接口。
 
-推荐选择一种方式：
+如果自定义域名是：
+
+```text
+webdav.halfrost.qzz.io
+```
+
+推荐配置为：
+
+```text
+webdav.halfrost.qzz.io/       -> cloudflare-webdav-user Pages
+webdav.halfrost.qzz.io/api/*  -> cloudflare-webdav Worker
+webdav.halfrost.qzz.io/dav/*  -> cloudflare-webdav Worker
+webdav.halfrost.qzz.io/health -> cloudflare-webdav Worker
+```
+
+这样访问：
+
+```text
+https://webdav.halfrost.qzz.io/
+```
+
+会进入统一登录界面。管理员登录后进入用户管理页面，普通用户登录后进入文件管理页面。
+
+也可以选择其他方式：
 
 - 给 Worker 和 Pages 配置同一个自定义域名下的路由。
 - 在 Worker 中允许 Pages 域名跨域访问。

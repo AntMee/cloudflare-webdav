@@ -32,7 +32,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -160,7 +161,8 @@ label {
   font-weight: 650;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--border-strong);
@@ -173,7 +175,8 @@ input {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
@@ -295,6 +298,18 @@ input:focus {
   gap: 10px;
   align-items: center;
   min-width: min(100%, 460px);
+}
+
+.admin-toolbar {
+  align-items: stretch;
+}
+
+.admin-form {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) 140px auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .file-section {
@@ -473,7 +488,8 @@ tbody tr:last-child td {
   }
 
   .topbar-actions,
-  .folder-form {
+  .folder-form,
+  .admin-form {
     width: 100%;
   }
 
@@ -481,6 +497,10 @@ tbody tr:last-child td {
   .folder-form .primary-button,
   .upload-button {
     flex: 1;
+  }
+
+  .admin-form {
+    grid-template-columns: 1fr;
   }
 
   .search-field {

@@ -470,15 +470,32 @@ git push
 
 ## 使用方法
 
-### 管理员后台
+### 统一登录入口
 
-打开管理员 Pages 地址：
+如果你的自定义域名是：
 
 ```text
-https://cloudflare-webdav-admin.pages.dev
+webdav.halfrost.qzz.io
 ```
 
-使用 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 登录。
+推荐把这个域名绑定到用户端 Pages 项目 `cloudflare-webdav-user`，并把 Worker 路由配置到同一个域名下：
+
+```text
+webdav.halfrost.qzz.io/api/*
+webdav.halfrost.qzz.io/dav/*
+webdav.halfrost.qzz.io/health
+```
+
+之后访问：
+
+```text
+https://webdav.halfrost.qzz.io/
+```
+
+会进入同一个登录界面。
+
+- 使用 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 登录，会进入管理员用户管理页面。
+- 使用管理员创建的普通用户登录，会进入文件管理页面。
 
 管理员可以：
 
@@ -486,15 +503,7 @@ https://cloudflare-webdav-admin.pages.dev
 - 禁用或启用普通用户
 - 重置普通用户密码
 
-### 用户端网页
-
-打开用户 Pages 地址：
-
-```text
-https://cloudflare-webdav-user.pages.dev
-```
-
-普通用户使用管理员创建的账号登录后，可以在网页中：
+普通用户可以：
 
 - 查看文件
 - 上传文件
@@ -507,7 +516,7 @@ https://cloudflare-webdav-user.pages.dev
 WebDAV 地址：
 
 ```text
-https://你的 Worker 域名/dav/
+https://webdav.halfrost.qzz.io/dav/
 ```
 
 用户名和密码使用管理员创建的普通用户账号。
