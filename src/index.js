@@ -32,7 +32,7 @@ export default {
       return withCors(text("Not Found", 404), request);
     } catch (error) {
       console.error(error);
-      return json({ error: error instanceof Error ? error.message : "Internal Error" }, 500, request);
+      return json({ error: "Internal Error" }, 500, request);
     }
   },
 };
@@ -42,9 +42,14 @@ async function handleAdmin(request, env, url) {
 
   if (request.method === "POST" && path === "/login") {
     const body = await readJson(request);
+    const rateLimit = await checkLoginRateLimit(env, request, String(body.username || ""));
+    if (!rateLimit.ok) return json({ error: "Too many login attempts" }, 429, request);
+
     if (body.username !== env.ADMIN_USERNAME || body.password !== env.ADMIN_PASSWORD) {
+      await recordFailedLogin(env, request, String(body.username || ""));
       return json({ error: "Invalid credentials" }, 401, request);
     }
+    await clearFailedLogin(env, request, String(body.username || ""));
     const token = await signJwt({ sub: body.username, role: "admin" }, env.JWT_SECRET, Number(env.SESSION_TTL_SECONDS || "43200"));
     return json({ token }, 200, request);
   }
@@ -57,14 +62,16 @@ async function handleAdmin(request, env, url) {
       "SELECT id, username, role, enabled, created_at, updated_at FROM users ORDER BY username ASC",
     ).all();
     return json({
-      users: result.results.map((user) => ({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        enabled: user.enabled === 1,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at,
-      })),
+      users: result.results
+        .filter((user) => !isInternalAdminFileUsername(user.username))
+        .map((user) => ({
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          enabled: user.enabled === 1,
+          createdAt: user.created_at,
+          updatedAt: user.updated_at,
+        })),
     }, 200, request);
   }
 
@@ -344,10 +351,10 @@ async function deleteEntry(env, userId, path) {
   if (!node) return text("Not Found", 404);
 
   if (node.kind === "directory") {
-    const result = await env.DB.prepare("SELECT id FROM nodes WHERE owner_user_id = ? AND path != ? AND path LIKE ? LIMIT 1")
-      .bind(userId, path, `${path}%`)
-      .first();
-    if (result) return text("Directory is not empty", 409);
+    const result = await env.DB.prepare("SELECT id, path FROM nodes WHERE owner_user_id = ? AND path != ?")
+      .bind(userId, path)
+      .all();
+    if (result.results.some((item) => isDescendant(path, item.path))) return text("Directory is not empty", 409);
   }
 
   if (node.kind === "file" && node.kv_key) {
@@ -392,18 +399,22 @@ function getUserSummary(db, userId) {
 }
 
 function getUserSummaryByUsername(db, username) {
-  return db.prepare("SELECT id, username FROM users WHERE username = ?").bind(username).first();
+  return db.prepare("SELECT id, username, role FROM users WHERE username = ?").bind(username).first();
 }
 
 async function ensureAdminFileUser(db, username) {
-  let user = await getUserSummaryByUsername(db, username);
-  if (user) return user;
+  const existingAdmin = await getUserSummaryByUsername(db, username);
+  if (existingAdmin?.role === "admin") return { id: existingAdmin.id, username };
+
+  const internalUsername = adminFileUsername(username);
+  let user = await getUserSummaryByUsername(db, internalUsername);
+  if (user) return { id: user.id, username };
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
   await db.prepare(
     "INSERT INTO users (id, username, password_hash, role, enabled, created_at, updated_at) VALUES (?, ?, ?, 'admin', 1, ?, ?)",
-  ).bind(id, username, "external-admin-login", now, now).run();
+  ).bind(id, internalUsername, "external-admin-file-owner", now, now).run();
   user = { id, username };
   await ensureRoot(db, id);
   return user;
@@ -414,7 +425,29 @@ async function requireAdmin(request, env) {
   if (!header?.startsWith("Bearer ")) return { ok: false, status: 401, error: "Unauthorized" };
   const payload = await verifyJwt(header.slice("Bearer ".length), env.JWT_SECRET);
   if (!payload || payload.role !== "admin") return { ok: false, status: 403, error: "Forbidden" };
+  if (!env.ADMIN_USERNAME || payload.sub !== env.ADMIN_USERNAME) return { ok: false, status: 403, error: "Forbidden" };
   return { ok: true, username: String(payload.sub || "") };
+}
+
+async function checkLoginRateLimit(env, request, username) {
+  const key = loginRateLimitKey(request, username);
+  const attempts = Number(await env.KV.get(key)) || 0;
+  return { ok: attempts < 5 };
+}
+
+async function recordFailedLogin(env, request, username) {
+  const key = loginRateLimitKey(request, username);
+  const attempts = (Number(await env.KV.get(key)) || 0) + 1;
+  await env.KV.put(key, String(attempts), { expirationTtl: 600 });
+}
+
+async function clearFailedLogin(env, request, username) {
+  await env.KV.delete(loginRateLimitKey(request, username));
+}
+
+function loginRateLimitKey(request, username) {
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+  return `rate-limit/admin-login/${ip}/${String(username || "").slice(0, 128)}`;
 }
 
 function parseBasicAuth(header) {
@@ -468,7 +501,12 @@ async function verifyJwt(token, secret) {
   if (parts.length !== 3) return null;
   const expected = await hmacSha256(`${parts[0]}.${parts[1]}`, secret);
   if (!timingSafeEqual(encoder.encode(expected), encoder.encode(parts[2]))) return null;
-  const payload = JSON.parse(decoder.decode(fromBase64Url(parts[1])));
+  let payload;
+  try {
+    payload = JSON.parse(decoder.decode(fromBase64Url(parts[1])));
+  } catch {
+    return null;
+  }
   if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }
@@ -526,6 +564,19 @@ function isDirectChild(parent, child) {
   return trimmed.length > 0 && !trimmed.includes("/");
 }
 
+function isDescendant(parent, child) {
+  return parent !== "/" && child.startsWith(parent);
+}
+
+function adminFileUsername(username) {
+  const safe = String(username || "admin").replaceAll(":", "_");
+  return `__cloudflare_webdav_admin__:${safe}`;
+}
+
+function isInternalAdminFileUsername(username) {
+  return String(username || "").startsWith("__cloudflare_webdav_admin__:");
+}
+
 function fileSummary(node) {
   return {
     name: nameFromPath(node.path),
@@ -574,6 +625,8 @@ function unauthorized(request) {
 }
 
 async function readJson(request) {
+  const contentLength = Number(request.headers.get("content-length") || "0");
+  if (contentLength > 65536) throw new Error("JSON request body is too large");
   try {
     return await request.json();
   } catch {
@@ -603,12 +656,16 @@ function withCors(response, request) {
 }
 
 function corsHeaders(request) {
-  const origin = request.headers.get("origin") || "*";
+  const origin = request.headers.get("origin");
+  const requestOrigin = new URL(request.url).origin;
+  if (origin && origin !== requestOrigin) return {};
+  const allowOrigin = origin || requestOrigin;
   return {
-    "access-control-allow-origin": origin,
+    "access-control-allow-origin": allowOrigin,
     "access-control-allow-methods": "GET, HEAD, POST, PATCH, PUT, DELETE, MKCOL, PROPFIND, OPTIONS",
     "access-control-allow-headers": "authorization, content-type, depth, x-webdav-web",
     "access-control-expose-headers": "etag, dav, content-length",
+    vary: "Origin",
   };
 }
 

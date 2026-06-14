@@ -132,6 +132,96 @@ test("admin can delete a file in the admin account's file space", async () => {
   assert.deepEqual(listBody.files.map((file) => file.name), ["SubFolder"]);
 });
 
+test("admin file API does not reuse a normal user with the same username", async () => {
+  const env = createTestEnv({
+    adminUsername: "same-name",
+    includeAdminUser: false,
+    includeAdminFiles: false,
+    users: [{
+      id: "normal-same-name",
+      username: "same-name",
+      password_hash: "unused",
+      role: "user",
+      enabled: 1,
+      created_at: "2026-06-14T01:00:00.000Z",
+      updated_at: "2026-06-14T01:59:00.000Z",
+    }],
+    nodes: [
+      node("/", "directory", { owner_user_id: "normal-same-name" }),
+      node("/private-user-file.json", "file", {
+        owner_user_id: "normal-same-name",
+        kv_key: "users/normal-same-name/private-user-file.json",
+        size: 2,
+      }),
+    ],
+  });
+  const token = await adminToken(env, { username: "same-name" });
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.notEqual(body.user.id, "normal-same-name");
+  assert.equal(body.user.username, "same-name");
+  assert.deepEqual(body.files, []);
+});
+
+test("admin token must match the current configured admin username", async () => {
+  const env = createTestEnv({ adminUsername: "current-admin" });
+  const token = await adminToken(createTestEnv({ adminUsername: "old-admin" }), { username: "old-admin" });
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/users", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(response.status, 403);
+});
+
+test("CORS does not allow authorization from untrusted browser origins", async () => {
+  const env = createTestEnv();
+  const response = await worker.fetch(new Request("https://example.test/dav/", {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://evil.example",
+      "access-control-request-method": "DELETE",
+      "access-control-request-headers": "authorization",
+    },
+  }), env);
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.has("access-control-allow-origin"), false);
+  assert.equal(response.headers.has("access-control-allow-headers"), false);
+});
+
+test("admin login is rate limited after repeated failures", async () => {
+  const env = createTestEnv();
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "cf-connecting-ip": "203.0.113.10",
+      },
+      body: JSON.stringify({ username: "admin", password: "wrong-password" }),
+    }), env);
+    assert.equal(response.status, 401);
+  }
+
+  const limited = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "cf-connecting-ip": "203.0.113.10",
+    },
+    body: JSON.stringify({ username: "admin", password: "wrong-password" }),
+  }), env);
+
+  assert.equal(limited.status, 429);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
@@ -142,7 +232,13 @@ async function adminToken(env, { username = "admin", password = "password" } = {
   return (await response.json()).token;
 }
 
-function createTestEnv({ adminUsername = "admin", includeAdminUser = true, includeAdminFiles = true } = {}) {
+function createTestEnv({
+  adminUsername = "admin",
+  includeAdminUser = true,
+  includeAdminFiles = true,
+  users: extraUsers = [],
+  nodes: extraNodes = [],
+} = {}) {
   const users = [
     ...(includeAdminUser ? [{
       id: "admin-user",
@@ -162,6 +258,7 @@ function createTestEnv({ adminUsername = "admin", includeAdminUser = true, inclu
       created_at: "2026-06-14T01:00:00.000Z",
       updated_at: "2026-06-14T01:59:00.000Z",
     },
+    ...extraUsers,
   ];
   const nodes = includeAdminFiles ? [
     node("/", "directory"),
@@ -180,16 +277,23 @@ function createTestEnv({ adminUsername = "admin", includeAdminUser = true, inclu
     }),
     node("/OtherUserOnly/", "directory", { owner_user_id: "user-1" }),
   ] : [];
+  nodes.push(...extraNodes);
 
   const kv = {
     deletedKeys: [],
+    values: new Map(),
     async get(key, type) {
+      if (type !== "arrayBuffer") return this.values.get(key) || null;
       assert.equal(type, "arrayBuffer");
       if (key !== "users/admin-user/DouyinBackup/config_backup.json") return null;
       return new TextEncoder().encode('{"ok":true}').buffer;
     },
+    async put(key, value) {
+      this.values.set(key, String(value));
+    },
     async delete(key) {
       this.deletedKeys.push(key);
+      this.values.delete(key);
     },
   };
 
@@ -198,6 +302,7 @@ function createTestEnv({ adminUsername = "admin", includeAdminUser = true, inclu
     ADMIN_PASSWORD: "password",
     JWT_SECRET: "test-secret",
     SESSION_TTL_SECONDS: "43200",
+    ALLOWED_ORIGINS: "https://example.test",
     DB: new FakeD1({ users, nodes }),
     KV: kv,
     ASSETS: { fetch: () => new Response("Not Found", { status: 404 }) },
@@ -250,9 +355,9 @@ class FakeStatement {
       const user = this.data.users.find((item) => item.id === this.params[0]);
       return user ? { id: user.id, username: user.username } : null;
     }
-    if (this.sql.includes("SELECT id, username FROM users WHERE username = ?")) {
+    if (this.sql.includes("SELECT id, username, role FROM users WHERE username = ?")) {
       const user = this.data.users.find((item) => item.username === this.params[0]);
-      return user ? { id: user.id, username: user.username } : null;
+      return user ? { id: user.id, username: user.username, role: user.role } : null;
     }
     if (this.sql.includes("SELECT * FROM nodes WHERE owner_user_id = ? AND path = ?")) {
       return this.data.nodes.find((node) => node.owner_user_id === this.params[0] && node.path === this.params[1]) || null;
@@ -266,6 +371,13 @@ class FakeStatement {
         results: this.data.nodes
           .filter((node) => node.owner_user_id === this.params[0] && node.path !== this.params[1])
           .sort((a, b) => a.path.localeCompare(b.path)),
+      };
+    }
+    if (this.sql.includes("SELECT id, path FROM nodes WHERE owner_user_id = ? AND path != ?")) {
+      return {
+        results: this.data.nodes
+          .filter((node) => node.owner_user_id === this.params[0] && node.path !== this.params[1])
+          .map((node) => ({ id: node.id, path: node.path })),
       };
     }
     throw new Error(`Unhandled all SQL: ${this.sql}`);
