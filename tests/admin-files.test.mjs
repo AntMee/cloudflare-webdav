@@ -222,6 +222,31 @@ test("admin login is rate limited after repeated failures", async () => {
   assert.equal(limited.status, 429);
 });
 
+test("WebDAV PUT rejects uploads without a valid content length", async () => {
+  const env = createTestEnv();
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "upload-user",
+    username: "upload-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+
+  const response = await worker.fetch(new Request("https://example.test/dav/config.json", {
+    method: "PUT",
+    headers: {
+      authorization: `Basic ${btoa("upload-user:user-password")}`,
+      "content-type": "application/json",
+    },
+    body: new Uint8Array([123, 125]),
+  }), env);
+
+  assert.equal(response.status, 411);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
@@ -230,6 +255,19 @@ async function adminToken(env, { username = "admin", password = "password" } = {
   }), env);
   assert.equal(response.status, 200);
   return (await response.json()).token;
+}
+
+async function createPasswordHash(password) {
+  const salt = new Uint8Array(16);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, key, 256);
+  return `pbkdf2-sha256:100000:${toBase64(salt)}:${toBase64(new Uint8Array(bits))}`;
+}
+
+function toBase64(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 function createTestEnv({

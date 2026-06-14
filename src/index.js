@@ -297,7 +297,11 @@ async function getFile(env, userId, path, headOnly) {
 async function putFile(request, env, userId, path) {
   if (path === "/" || path.endsWith("/")) return text("Conflict", 409);
   const maxBytes = Number(env.MAX_FILE_BYTES || "20971520");
-  const contentLength = Number(request.headers.get("content-length") || "0");
+  const contentLengthHeader = request.headers.get("content-length");
+  const contentLength = Number(contentLengthHeader);
+  if (!contentLengthHeader || !Number.isFinite(contentLength) || contentLength < 0) {
+    return text("Length Required", 411);
+  }
   if (contentLength > maxBytes) return text("File too large", 413);
 
   await ensureParentDirectories(env.DB, userId, path);
