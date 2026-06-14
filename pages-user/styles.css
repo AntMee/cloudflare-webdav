@@ -272,6 +272,33 @@ select:focus {
   align-items: center;
 }
 
+.admin-tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px;
+}
+
+.tab-button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.tab-button.active {
+  background: #eff6ff;
+  color: var(--accent);
+}
+
 .breadcrumbs {
   display: flex;
   flex-wrap: wrap;
@@ -320,6 +347,21 @@ select:focus {
 
 .admin-toolbar {
   align-items: stretch;
+}
+
+.admin-file-toolbar {
+  align-items: flex-start;
+}
+
+.admin-file-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-file-controls select {
+  min-width: 220px;
 }
 
 .admin-form {
@@ -507,6 +549,7 @@ tbody tr:last-child td {
 
   .topbar-actions,
   .toolbar-actions,
+  .admin-file-controls,
   .folder-form,
   .admin-form {
     width: 100%;
@@ -514,9 +557,23 @@ tbody tr:last-child td {
 
   .topbar-actions .ghost-button,
   .toolbar-actions .ghost-button,
+  .admin-file-controls .ghost-button,
   .folder-form .primary-button,
   .upload-button {
     flex: 1;
+  }
+
+  .admin-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .tab-button {
+    flex: 1;
+  }
+
+  .admin-file-controls select {
+    min-width: 0;
   }
 
   .admin-form {

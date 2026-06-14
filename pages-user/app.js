@@ -3,7 +3,11 @@ const state = {
   userAuth: sessionStorage.getItem("webdavUserAuth") || "",
   username: sessionStorage.getItem("webdavUsername") || "",
   currentPath: "/",
+  adminCurrentPath: "/",
+  adminPanel: "users",
+  adminSelectedUserId: "",
   files: [],
+  adminFiles: [],
   users: [],
 };
 
@@ -12,12 +16,23 @@ const elements = {
   loginForm: document.querySelector("#login-form"),
   adminView: document.querySelector("#admin-view"),
   filesView: document.querySelector("#files-view"),
+  adminUsersTab: document.querySelector("#admin-users-tab"),
+  adminFilesTab: document.querySelector("#admin-files-tab"),
+  adminUsersPanel: document.querySelector("#admin-users-panel"),
+  adminFilesPanel: document.querySelector("#admin-files-panel"),
   createUserForm: document.querySelector("#create-user-form"),
   refreshUsers: document.querySelector("#refresh-users"),
   adminLogoutButton: document.querySelector("#admin-logout-button"),
   userSearch: document.querySelector("#user-search"),
   userList: document.querySelector("#user-list"),
   userEmptyState: document.querySelector("#user-empty-state"),
+  adminFileUser: document.querySelector("#admin-file-user"),
+  adminBackFolder: document.querySelector("#admin-back-folder"),
+  adminRefreshFiles: document.querySelector("#admin-refresh-files"),
+  adminFileBreadcrumbs: document.querySelector("#admin-file-breadcrumbs"),
+  adminFileSearch: document.querySelector("#admin-file-search"),
+  adminFileList: document.querySelector("#admin-file-list"),
+  adminFileEmptyState: document.querySelector("#admin-file-empty-state"),
   refreshFiles: document.querySelector("#refresh-files"),
   backFolder: document.querySelector("#back-folder"),
   userLogoutButton: document.querySelector("#user-logout-button"),
@@ -34,9 +49,15 @@ const elements = {
 
 elements.loginForm.addEventListener("submit", handleLogin);
 elements.createUserForm.addEventListener("submit", handleCreateUser);
-elements.refreshUsers.addEventListener("click", loadUsers);
+elements.refreshUsers.addEventListener("click", refreshAdminView);
 elements.adminLogoutButton.addEventListener("click", logout);
+elements.adminUsersTab.addEventListener("click", () => showAdminPanel("users"));
+elements.adminFilesTab.addEventListener("click", () => showAdminPanel("files"));
 elements.userSearch.addEventListener("input", renderUsers);
+elements.adminFileUser.addEventListener("change", handleAdminFileUserChange);
+elements.adminBackFolder.addEventListener("click", goBackAdminFolder);
+elements.adminRefreshFiles.addEventListener("click", () => loadAdminDirectory(state.adminCurrentPath));
+elements.adminFileSearch.addEventListener("input", renderAdminFiles);
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
 elements.backFolder.addEventListener("click", goBackFolder);
 elements.userLogoutButton.addEventListener("click", logout);
@@ -116,6 +137,7 @@ async function loadUsers() {
     const body = await adminApi("/api/admin/users");
     state.users = Array.isArray(body.users) ? body.users : [];
     renderUsers();
+    syncAdminFileUsers();
   } catch (error) {
     if (error.status === 401 || error.status === 403) logout();
     showToast(error.message, true);
@@ -150,6 +172,57 @@ async function handleCreateUser(event) {
   } catch (error) {
     showToast(error.message, true);
   }
+}
+
+function syncAdminFileUsers() {
+  elements.adminFileUser.innerHTML = state.users.map((user) => (
+    `<option value="${escapeHtml(user.id)}">${escapeHtml(user.username)}</option>`
+  )).join("");
+
+  if (!state.users.some((user) => user.id === state.adminSelectedUserId)) {
+    state.adminSelectedUserId = state.users[0]?.id || "";
+    state.adminCurrentPath = "/";
+  }
+
+  elements.adminFileUser.value = state.adminSelectedUserId;
+  if (!state.adminSelectedUserId) {
+    state.adminFiles = [];
+    renderAdminFiles();
+  }
+}
+
+async function handleAdminFileUserChange() {
+  state.adminSelectedUserId = elements.adminFileUser.value;
+  state.adminCurrentPath = "/";
+  await loadAdminDirectory("/");
+}
+
+async function loadAdminDirectory(path) {
+  if (!state.adminSelectedUserId) {
+    state.adminFiles = [];
+    renderAdminFiles();
+    return;
+  }
+
+  state.adminCurrentPath = ensureDirectory(path);
+  try {
+    const query = new URLSearchParams({
+      userId: state.adminSelectedUserId,
+      path: state.adminCurrentPath,
+    });
+    const body = await adminApi(`/api/admin/files?${query.toString()}`);
+    state.adminFiles = Array.isArray(body.files) ? body.files : [];
+    state.adminCurrentPath = ensureDirectory(body.path || state.adminCurrentPath);
+    renderAdminFiles();
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) logout();
+    showToast(error.message, true);
+  }
+}
+
+function goBackAdminFolder() {
+  if (state.adminCurrentPath === "/") return;
+  loadAdminDirectory(parentDirectory(state.adminCurrentPath));
 }
 
 async function toggleUser(userId, enabled) {
@@ -197,6 +270,9 @@ function renderUsers() {
   elements.userList.querySelectorAll("[data-reset-user]").forEach((button) => {
     button.addEventListener("click", () => resetPassword(button.dataset.resetUser));
   });
+  elements.userList.querySelectorAll("[data-view-files]").forEach((button) => {
+    button.addEventListener("click", () => openAdminFilesForUser(button.dataset.viewFiles));
+  });
 }
 
 function userRow(user) {
@@ -216,10 +292,40 @@ function userRow(user) {
             ${enabled ? "禁用" : "启用"}
           </button>
           <button class="table-action" type="button" data-reset-user="${escapeHtml(user.id)}">重置密码</button>
+          <button class="table-action" type="button" data-view-files="${escapeHtml(user.id)}">查看文件</button>
         </div>
       </td>
     </tr>
   `;
+}
+
+async function openAdminFilesForUser(userId) {
+  state.adminSelectedUserId = userId;
+  state.adminCurrentPath = "/";
+  elements.adminFileUser.value = userId;
+  showAdminPanel("files");
+  await loadAdminDirectory("/");
+}
+
+function showAdminPanel(panel) {
+  const showFiles = panel === "files";
+  state.adminPanel = panel;
+  elements.adminUsersPanel.classList.toggle("hidden", showFiles);
+  elements.adminFilesPanel.classList.toggle("hidden", !showFiles);
+  elements.adminUsersTab.classList.toggle("active", !showFiles);
+  elements.adminFilesTab.classList.toggle("active", showFiles);
+
+  if (showFiles && state.adminSelectedUserId && state.adminFiles.length === 0) {
+    loadAdminDirectory(state.adminCurrentPath);
+  }
+}
+
+async function refreshAdminView() {
+  if (state.adminPanel === "files") {
+    await loadAdminDirectory(state.adminCurrentPath);
+    return;
+  }
+  await loadUsers();
 }
 
 async function loadDirectory(path) {
@@ -325,6 +431,31 @@ async function deleteEntry(file) {
   }
 }
 
+async function adminDownloadFile(file) {
+  if (!state.adminSelectedUserId) return;
+  try {
+    const query = new URLSearchParams({
+      userId: state.adminSelectedUserId,
+      path: file.path,
+    });
+    const response = await fetch(`/api/admin/files/download?${query.toString()}`, {
+      headers: { authorization: `Bearer ${state.adminToken}` },
+    });
+    if (!response.ok) throw new Error(`下载失败：${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 async function propfind(path, depth) {
   const response = await fetch(davUrl(path), {
     method: "PROPFIND",
@@ -374,10 +505,7 @@ function renderFiles() {
   renderBreadcrumbs();
   const query = elements.fileSearch.value.trim().toLowerCase();
   const filtered = state.files.filter((file) => file.name.toLowerCase().includes(query));
-  filtered.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
+  filtered.sort(sortFiles);
 
   elements.fileList.innerHTML = filtered.map(fileRow).join("");
   elements.emptyState.classList.toggle("hidden", filtered.length > 0);
@@ -406,12 +534,42 @@ function renderFiles() {
   });
 }
 
-function fileRow(file) {
+function renderAdminFiles() {
+  renderAdminBreadcrumbs();
+  const query = elements.adminFileSearch.value.trim().toLowerCase();
+  const filtered = state.adminFiles.filter((file) => file.name.toLowerCase().includes(query));
+  filtered.sort(sortFiles);
+
+  elements.adminFileList.innerHTML = filtered.map((file) => fileRow(file, { admin: true })).join("");
+  const isEmpty = !state.adminSelectedUserId || filtered.length === 0;
+  elements.adminFileEmptyState.classList.toggle("hidden", !isEmpty);
+  elements.adminFileEmptyState.querySelector("p").textContent = state.adminSelectedUserId ? "当前目录为空" : "请选择用户";
+
+  elements.adminFileList.querySelectorAll("[data-admin-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const file = state.adminFiles.find((item) => item.path === button.dataset.adminOpen);
+      if (!file) return;
+      if (file.type === "directory") loadAdminDirectory(file.path);
+      else adminDownloadFile(file);
+    });
+  });
+
+  elements.adminFileList.querySelectorAll("[data-admin-download]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const file = state.adminFiles.find((item) => item.path === button.dataset.adminDownload);
+      if (file) adminDownloadFile(file);
+    });
+  });
+}
+
+function fileRow(file, options = {}) {
   const isDirectory = file.type === "directory";
+  const openAttr = options.admin ? "data-admin-open" : "data-open";
+  const downloadAttr = options.admin ? "data-admin-download" : "data-download";
   return `
     <tr>
       <td>
-        <button class="file-name" type="button" data-open="${escapeHtml(file.path)}">
+        <button class="file-name" type="button" ${openAttr}="${escapeHtml(file.path)}">
           <span class="file-icon ${isDirectory ? "folder" : ""}">
             ${isDirectory ? folderIcon() : fileIcon()}
           </span>
@@ -423,8 +581,8 @@ function fileRow(file) {
       <td>${escapeHtml(formatDate(file.modified))}</td>
       <td>
         <div class="row-actions">
-          ${isDirectory ? "" : `<button class="table-action" type="button" data-download="${escapeHtml(file.path)}">下载</button>`}
-          <button class="table-action danger" type="button" data-delete="${escapeHtml(file.path)}">删除</button>
+          ${isDirectory ? "" : `<button class="table-action" type="button" ${downloadAttr}="${escapeHtml(file.path)}">下载</button>`}
+          ${options.admin ? "" : `<button class="table-action danger" type="button" data-delete="${escapeHtml(file.path)}">删除</button>`}
         </div>
       </td>
     </tr>
@@ -449,6 +607,26 @@ function renderBreadcrumbs() {
   });
 
   elements.backFolder.disabled = state.currentPath === "/";
+}
+
+function renderAdminBreadcrumbs() {
+  const parts = state.adminCurrentPath.split("/").filter(Boolean);
+  const crumbs = [{ label: "根目录", path: "/" }];
+  let next = "/";
+  for (const part of parts) {
+    next = ensureDirectory(joinPath(next, part));
+    crumbs.push({ label: part, path: next });
+  }
+
+  elements.adminFileBreadcrumbs.innerHTML = crumbs.map((crumb) => (
+    `<button class="breadcrumb" type="button" data-admin-path="${escapeHtml(crumb.path)}">${escapeHtml(crumb.label)}</button>`
+  )).join("");
+
+  elements.adminFileBreadcrumbs.querySelectorAll("[data-admin-path]").forEach((button) => {
+    button.addEventListener("click", () => loadAdminDirectory(button.dataset.adminPath));
+  });
+
+  elements.adminBackFolder.disabled = state.adminCurrentPath === "/" || !state.adminSelectedUserId;
 }
 
 async function adminApi(path, options = {}) {
@@ -488,7 +666,10 @@ function logout() {
   state.userAuth = "";
   state.username = "";
   state.currentPath = "/";
+  state.adminCurrentPath = "/";
+  state.adminSelectedUserId = "";
   state.files = [];
+  state.adminFiles = [];
   state.users = [];
   sessionStorage.removeItem("webdavAdminToken");
   sessionStorage.removeItem("webdavUserAuth");
@@ -516,6 +697,11 @@ function parentDirectory(path) {
   const clean = path.endsWith("/") ? path.slice(0, -1) : path;
   const index = clean.lastIndexOf("/");
   return index <= 0 ? "/" : `${clean.slice(0, index)}/`;
+}
+
+function sortFiles(left, right) {
+  if (left.type !== right.type) return left.type === "directory" ? -1 : 1;
+  return left.name.localeCompare(right.name);
 }
 
 function encodePathPart(value) {

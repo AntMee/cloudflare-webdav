@@ -45,7 +45,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Admin</p>
-            <h1 id="admin-title">用户管理</h1>
+            <h1 id="admin-title">管理后台</h1>
           </div>
           <div class="topbar-actions">
             <button class="ghost-button" id="refresh-users" type="button">刷新</button>
@@ -53,52 +53,111 @@
           </div>
         </header>
 
-        <section class="toolbar admin-toolbar" aria-label="新增用户">
-          <form class="admin-form" id="create-user-form">
-            <input id="new-username" name="username" placeholder="用户名" autocomplete="off" minlength="3" maxlength="64" required />
-            <input id="new-password" name="password" placeholder="初始密码" type="password" minlength="8" required />
-            <select id="new-role" name="role">
-              <option value="user">普通用户</option>
-              <option value="admin">管理员</option>
-            </select>
-            <button class="primary-button inline" type="submit">新增用户</button>
-          </form>
-        </section>
+        <nav class="admin-tabs" aria-label="管理区域">
+          <button class="tab-button active" id="admin-users-tab" type="button">用户管理</button>
+          <button class="tab-button" id="admin-files-tab" type="button">文件管理</button>
+        </nav>
 
-        <section class="file-section" aria-labelledby="admin-users-title">
-          <div class="section-heading row-heading">
-            <div>
-              <h2 id="admin-users-title">用户列表</h2>
-              <p class="muted">管理员可以新增用户、禁用用户、重置密码。</p>
-            </div>
-            <label class="search-field">
-              <span class="sr-only">搜索用户</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m21 21-4.35-4.35" />
-                <circle cx="11" cy="11" r="7" />
-              </svg>
-              <input id="user-search" placeholder="搜索用户" autocomplete="off" />
-            </label>
-          </div>
+        <div id="admin-users-panel">
+          <section class="toolbar admin-toolbar" aria-label="新增用户">
+            <form class="admin-form" id="create-user-form">
+              <input id="new-username" name="username" placeholder="用户名" autocomplete="off" minlength="3" maxlength="64" required />
+              <input id="new-password" name="password" placeholder="初始密码" type="password" minlength="8" required />
+              <select id="new-role" name="role">
+                <option value="user">普通用户</option>
+                <option value="admin">管理员</option>
+              </select>
+              <button class="primary-button inline" type="submit">新增用户</button>
+            </form>
+          </section>
 
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>用户名</th>
-                  <th>角色</th>
-                  <th>状态</th>
-                  <th>更新时间</th>
-                  <th class="action-col">操作</th>
-                </tr>
-              </thead>
-              <tbody id="user-list"></tbody>
-            </table>
-            <div class="empty-state hidden" id="user-empty-state">
-              <p>暂无用户</p>
+          <section class="file-section" aria-labelledby="admin-users-title">
+            <div class="section-heading row-heading">
+              <div>
+                <h2 id="admin-users-title">用户列表</h2>
+                <p class="muted">管理员可以新增用户、禁用用户、重置密码，并查看用户上传的文件。</p>
+              </div>
+              <label class="search-field">
+                <span class="sr-only">搜索用户</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m21 21-4.35-4.35" />
+                  <circle cx="11" cy="11" r="7" />
+                </svg>
+                <input id="user-search" placeholder="搜索用户" autocomplete="off" />
+              </label>
             </div>
-          </div>
-        </section>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>用户名</th>
+                    <th>角色</th>
+                    <th>状态</th>
+                    <th>更新时间</th>
+                    <th class="action-col">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="user-list"></tbody>
+              </table>
+              <div class="empty-state hidden" id="user-empty-state">
+                <p>暂无用户</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="hidden" id="admin-files-panel">
+          <section class="toolbar admin-file-toolbar" aria-label="管理员文件操作">
+            <div class="admin-file-controls">
+              <select id="admin-file-user" aria-label="选择用户"></select>
+              <button class="ghost-button" id="admin-back-folder" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M19 12H5" />
+                  <path d="m12 19-7-7 7-7" />
+                </svg>
+                <span>返回上一级</span>
+              </button>
+              <button class="ghost-button" id="admin-refresh-files" type="button">刷新文件</button>
+            </div>
+            <nav class="breadcrumbs" id="admin-file-breadcrumbs" aria-label="管理员当前目录"></nav>
+          </section>
+
+          <section class="file-section" aria-labelledby="admin-files-title">
+            <div class="section-heading row-heading">
+              <div>
+                <h2 id="admin-files-title">用户文件</h2>
+                <p class="muted">选择用户后，可以浏览和下载该用户通过 WebDAV 上传的文件。</p>
+              </div>
+              <label class="search-field">
+                <span class="sr-only">搜索用户文件</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m21 21-4.35-4.35" />
+                  <circle cx="11" cy="11" r="7" />
+                </svg>
+                <input id="admin-file-search" placeholder="搜索当前目录" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>类型</th>
+                    <th>大小</th>
+                    <th>修改时间</th>
+                    <th class="action-col">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-file-list"></tbody>
+              </table>
+              <div class="empty-state hidden" id="admin-file-empty-state">
+                <p>当前目录为空</p>
+              </div>
+            </div>
+          </section>
+        </div>
       </section>
 
       <section class="files-view hidden" id="files-view" aria-labelledby="files-title">

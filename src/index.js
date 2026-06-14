@@ -68,6 +68,14 @@ async function handleAdmin(request, env, url) {
     }, 200, request);
   }
 
+  if (request.method === "GET" && path === "/files") {
+    return adminListFiles(env, url, request);
+  }
+
+  if (request.method === "GET" && path === "/files/download") {
+    return adminDownloadFile(env, url);
+  }
+
   if (request.method === "POST" && path === "/users") {
     const body = await readJson(request);
     const username = String(body.username || "").trim();
@@ -113,6 +121,59 @@ async function handleAdmin(request, env, url) {
   }
 
   return text("Method Not Allowed", 405, { allow: "GET, POST, PATCH" });
+}
+
+async function adminListFiles(env, url, request) {
+  const userId = String(url.searchParams.get("userId") || "");
+  const path = normalizeAdminFilePath(url.searchParams.get("path") || "/");
+  if (!userId) return json({ error: "Missing userId" }, 400, request);
+  if (!path.ok) return json({ error: path.message }, path.status, request);
+
+  const user = await getUserSummary(env.DB, userId);
+  if (!user) return json({ error: "User not found" }, 404, request);
+
+  await ensureRoot(env.DB, userId);
+  const node = await getNode(env.DB, userId, path.path);
+  if (!node || node.kind !== "directory") return json({ error: "Directory not found" }, 404, request);
+
+  const result = await env.DB.prepare(
+    `SELECT * FROM nodes
+     WHERE owner_user_id = ?
+       AND path != ?
+     ORDER BY kind ASC, path ASC`,
+  ).bind(userId, path.path).all();
+
+  const files = result.results
+    .filter((item) => isDirectChild(path.path, item.path))
+    .sort(sortNodes)
+    .map(fileSummary);
+
+  return json({ user, path: path.path, files }, 200, request);
+}
+
+async function adminDownloadFile(env, url) {
+  const userId = String(url.searchParams.get("userId") || "");
+  const path = normalizeAdminFilePath(url.searchParams.get("path") || "/");
+  if (!userId) return json({ error: "Missing userId" }, 400);
+  if (!path.ok) return json({ error: path.message }, path.status);
+
+  const user = await getUserSummary(env.DB, userId);
+  if (!user) return json({ error: "User not found" }, 404);
+
+  const node = await getNode(env.DB, userId, path.path);
+  if (!node || node.kind !== "file" || !node.kv_key) return text("Not Found", 404);
+
+  const file = await env.KV.get(node.kv_key, "arrayBuffer");
+  if (!file) return text("Not Found", 404);
+
+  return new Response(file, {
+    headers: {
+      "content-type": node.mime_type || "application/octet-stream",
+      "content-length": String(node.size || file.byteLength),
+      "content-disposition": `attachment; filename="${contentDispositionFilename(nameFromPath(node.path))}"`,
+      etag: node.etag || "",
+    },
+  });
 }
 
 async function handleWebDav(request, env, url) {
@@ -287,6 +348,10 @@ function getNode(db, userId, path) {
   return db.prepare("SELECT * FROM nodes WHERE owner_user_id = ? AND path = ?").bind(userId, path).first();
 }
 
+function getUserSummary(db, userId) {
+  return db.prepare("SELECT id, username FROM users WHERE id = ?").bind(userId).first();
+}
+
 async function requireAdmin(request, env) {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return { ok: false, status: 401, error: "Unauthorized" };
@@ -370,6 +435,14 @@ function normalizeDavPath(pathname) {
   } catch {
     return { ok: false, status: 400, message: "Invalid path" };
   }
+  return normalizePathValue(decoded);
+}
+
+function normalizeAdminFilePath(value) {
+  return normalizePathValue(String(value || "/"));
+}
+
+function normalizePathValue(decoded) {
   if (!decoded.startsWith("/")) decoded = `/${decoded}`;
   if (/[\u0000-\u001F\u007F]/u.test(decoded)) return { ok: false, status: 400, message: "Invalid path" };
   const trailing = decoded.endsWith("/");
@@ -394,6 +467,36 @@ function isDirectChild(parent, child) {
   const rest = parent === "/" ? child.slice(1) : child.slice(parent.length);
   const trimmed = rest.endsWith("/") ? rest.slice(0, -1) : rest;
   return trimmed.length > 0 && !trimmed.includes("/");
+}
+
+function fileSummary(node) {
+  return {
+    name: nameFromPath(node.path),
+    path: node.kind === "directory" ? ensureDirectoryPath(node.path) : node.path,
+    type: node.kind,
+    size: Number(node.size || 0),
+    modified: node.updated_at,
+  };
+}
+
+function sortNodes(left, right) {
+  if (left.kind !== right.kind) return left.kind === "directory" ? -1 : 1;
+  return left.path.localeCompare(right.path);
+}
+
+function nameFromPath(path) {
+  if (path === "/") return "";
+  const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
+  return trimmed.slice(trimmed.lastIndexOf("/") + 1);
+}
+
+function ensureDirectoryPath(path) {
+  if (path === "/") return "/";
+  return path.endsWith("/") ? path : `${path}/`;
+}
+
+function contentDispositionFilename(value) {
+  return String(value || "download").replace(/[\\"]/g, "_");
 }
 
 function davMultistatus(nodes, origin) {
