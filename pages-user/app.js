@@ -36,6 +36,9 @@ const elements = {
   userEmptyState: document.querySelector("#user-empty-state"),
   adminBackFolder: document.querySelector("#admin-back-folder"),
   adminRefreshFiles: document.querySelector("#admin-refresh-files"),
+  adminFolderForm: document.querySelector("#admin-folder-form"),
+  adminFolderName: document.querySelector("#admin-folder-name"),
+  adminCreateFolderButton: document.querySelector("#admin-create-folder-button"),
   adminFileBreadcrumbs: document.querySelector("#admin-file-breadcrumbs"),
   adminFileSearch: document.querySelector("#admin-file-search"),
   adminFileList: document.querySelector("#admin-file-list"),
@@ -63,6 +66,8 @@ elements.adminFilesTab.addEventListener("click", () => showAdminPanel("files"));
 elements.userSearch.addEventListener("input", renderUsers);
 elements.adminBackFolder.addEventListener("click", goBackAdminFolder);
 elements.adminRefreshFiles.addEventListener("click", () => loadAdminDirectory(state.adminCurrentPath));
+elements.adminFolderForm.addEventListener("submit", handleAdminCreateFolder);
+elements.adminFolderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
 elements.adminFileSearch.addEventListener("input", renderAdminFiles);
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
 elements.backFolder.addEventListener("click", goBackFolder);
@@ -202,6 +207,31 @@ async function loadAdminDirectory(path) {
 function goBackAdminFolder() {
   if (state.adminCurrentPath === "/") return;
   loadAdminDirectory(parentDirectory(state.adminCurrentPath));
+}
+
+async function handleAdminCreateFolder(event) {
+  event.preventDefault();
+  const name = elements.adminFolderName.value.trim();
+  if (!isValidFolderName(name)) {
+    showToast(name ? "文件夹名称无效" : "请输入文件夹名称", true);
+    return;
+  }
+
+  elements.adminCreateFolderButton.disabled = true;
+  try {
+    const target = ensureDirectory(joinPath(state.adminCurrentPath, name));
+    await adminApi("/api/admin/files/folders", {
+      method: "POST",
+      body: JSON.stringify({ path: target }),
+    });
+    elements.adminFolderForm.reset();
+    await loadAdminDirectory(state.adminCurrentPath);
+    showToast("文件夹已创建");
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    elements.adminCreateFolderButton.disabled = false;
+  }
 }
 
 async function toggleUser(userId, enabled) {
@@ -344,7 +374,7 @@ async function handleUpload() {
 async function handleCreateFolder(event) {
   event.preventDefault();
   const name = elements.folderName.value.trim();
-  if (!/^[^\\/:*?"<>|]{1,80}$/.test(name)) {
+  if (!isValidFolderName(name)) {
     showToast(name ? "文件夹名称无效" : "请输入文件夹名称", true);
     return;
   }
@@ -697,6 +727,10 @@ function parentDirectory(path) {
   const clean = path.endsWith("/") ? path.slice(0, -1) : path;
   const index = clean.lastIndexOf("/");
   return index <= 0 ? "/" : `${clean.slice(0, index)}/`;
+}
+
+function isValidFolderName(name) {
+  return /^[^\\/:*?"<>|]{1,80}$/.test(name);
 }
 
 function sortFiles(left, right) {

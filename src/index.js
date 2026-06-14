@@ -76,6 +76,10 @@ async function handleAdmin(request, env, url) {
     return adminDownloadFile(env, url, admin.username);
   }
 
+  if (request.method === "POST" && path === "/files/folders") {
+    return adminCreateFolder(request, env, admin.username);
+  }
+
   if (request.method === "POST" && path === "/users") {
     const body = await readJson(request);
     const username = String(body.username || "").trim();
@@ -170,6 +174,32 @@ async function adminDownloadFile(env, url, adminUsername) {
       etag: node.etag || "",
     },
   });
+}
+
+async function adminCreateFolder(request, env, adminUsername) {
+  const body = await readJson(request);
+  const path = normalizeAdminFilePath(body.path || "/");
+  if (!path.ok) return json({ error: path.message }, path.status, request);
+  if (path.path === "/" || !path.path.endsWith("/")) return json({ error: "Invalid folder path" }, 400, request);
+
+  const user = await ensureAdminFileUser(env.DB, adminUsername);
+  await ensureRoot(env.DB, user.id);
+
+  const parent = await getNode(env.DB, user.id, parentPath(path.path));
+  if (!parent || parent.kind !== "directory") return json({ error: "Parent directory not found" }, 409, request);
+  if (await getNode(env.DB, user.id, path.path)) return json({ error: "Folder already exists" }, 409, request);
+
+  await createDirectory(env.DB, user.id, path.path);
+  return json({
+    path: path.path,
+    file: {
+      name: nameFromPath(path.path),
+      path: path.path,
+      type: "directory",
+      size: 0,
+      modified: new Date().toISOString(),
+    },
+  }, 201, request);
 }
 
 async function handleWebDav(request, env, url) {

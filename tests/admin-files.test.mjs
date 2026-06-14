@@ -79,6 +79,38 @@ test("admin file API uses the configured admin username as the owner", async () 
   assert.equal(body.user.username, "owner-admin");
 });
 
+test("admin can create a folder in the admin account's file space", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const token = await adminToken(env);
+
+  const createResponse = await worker.fetch(new Request("https://example.test/api/admin/files/folders", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ path: "/AdminFolder/" }),
+  }), env);
+
+  assert.equal(createResponse.status, 201);
+  const createBody = await createResponse.json();
+  assert.equal(createBody.path, "/AdminFolder/");
+
+  const listResponse = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+  assert.equal(listResponse.status, 200);
+
+  const listBody = await listResponse.json();
+  assert.deepEqual(listBody.files.map((file) => ({
+    name: file.name,
+    path: file.path,
+    type: file.type,
+  })), [
+    { name: "AdminFolder", path: "/AdminFolder/", type: "directory" },
+  ]);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
