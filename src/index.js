@@ -45,7 +45,7 @@ async function handleAdmin(request, env, url) {
     if (body.username !== env.ADMIN_USERNAME || body.password !== env.ADMIN_PASSWORD) {
       return json({ error: "Invalid credentials" }, 401, request);
     }
-    const token = await signJwt({ sub: "admin", role: "admin" }, env.JWT_SECRET, Number(env.SESSION_TTL_SECONDS || "43200"));
+    const token = await signJwt({ sub: body.username, role: "admin" }, env.JWT_SECRET, Number(env.SESSION_TTL_SECONDS || "43200"));
     return json({ token }, 200, request);
   }
 

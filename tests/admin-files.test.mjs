@@ -66,21 +66,34 @@ test("admin file API creates the admin account file space when missing", async (
   assert.deepEqual(body.files, []);
 });
 
-async function adminToken(env) {
+test("admin file API uses the configured admin username as the owner", async () => {
+  const env = createTestEnv({ adminUsername: "owner-admin", includeAdminUser: false, includeAdminFiles: false });
+  const token = await adminToken(env, { username: "owner-admin" });
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.username, "owner-admin");
+});
+
+async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "admin", password: "password" }),
+    body: JSON.stringify({ username, password }),
   }), env);
   assert.equal(response.status, 200);
   return (await response.json()).token;
 }
 
-function createTestEnv({ includeAdminUser = true, includeAdminFiles = true } = {}) {
+function createTestEnv({ adminUsername = "admin", includeAdminUser = true, includeAdminFiles = true } = {}) {
   const users = [
     ...(includeAdminUser ? [{
       id: "admin-user",
-      username: "admin",
+      username: adminUsername,
       password_hash: "unused",
       role: "admin",
       enabled: 1,
@@ -116,7 +129,7 @@ function createTestEnv({ includeAdminUser = true, includeAdminFiles = true } = {
   ] : [];
 
   return {
-    ADMIN_USERNAME: "admin",
+    ADMIN_USERNAME: adminUsername,
     ADMIN_PASSWORD: "password",
     JWT_SECRET: "test-secret",
     SESSION_TTL_SECONDS: "43200",

@@ -1,5 +1,6 @@
 const state = {
   adminToken: sessionStorage.getItem("webdavAdminToken") || "",
+  adminUsername: sessionStorage.getItem("webdavAdminUsername") || "",
   userAuth: sessionStorage.getItem("webdavUserAuth") || "",
   username: sessionStorage.getItem("webdavUsername") || "",
   currentPath: "/",
@@ -15,6 +16,14 @@ const elements = {
   loginForm: document.querySelector("#login-form"),
   adminView: document.querySelector("#admin-view"),
   filesView: document.querySelector("#files-view"),
+  adminAccountLabel: document.querySelector("#admin-account-label"),
+  currentUserLabel: document.querySelector("#current-user-label"),
+  userCount: document.querySelector("#user-count"),
+  enabledUserCount: document.querySelector("#enabled-user-count"),
+  fileCount: document.querySelector("#file-count"),
+  currentPathLabel: document.querySelector("#current-path-label"),
+  adminFileCount: document.querySelector("#admin-file-count"),
+  adminCurrentPath: document.querySelector("#admin-current-path"),
   adminUsersTab: document.querySelector("#admin-users-tab"),
   adminFilesTab: document.querySelector("#admin-files-tab"),
   adminUsersPanel: document.querySelector("#admin-users-panel"),
@@ -99,7 +108,9 @@ async function tryAdminLogin(username, password) {
 
   const body = await response.json();
   state.adminToken = body.token;
+  state.adminUsername = username;
   sessionStorage.setItem("webdavAdminToken", state.adminToken);
+  sessionStorage.setItem("webdavAdminUsername", state.adminUsername);
   sessionStorage.removeItem("webdavUserAuth");
   sessionStorage.removeItem("webdavUsername");
   elements.loginForm.reset();
@@ -118,6 +129,7 @@ async function tryUserLogin(username, password) {
     sessionStorage.setItem("webdavUserAuth", state.userAuth);
     sessionStorage.setItem("webdavUsername", state.username);
     sessionStorage.removeItem("webdavAdminToken");
+    sessionStorage.removeItem("webdavAdminUsername");
     elements.loginForm.reset();
     showFilesView();
     await loadDirectory("/");
@@ -134,6 +146,7 @@ async function loadUsers() {
     const body = await adminApi("/api/admin/users");
     state.users = Array.isArray(body.users) ? body.users : [];
     renderUsers();
+    updateUserStats();
   } catch (error) {
     if (error.status === 401 || error.status === 403) logout();
     showToast(error.message, true);
@@ -229,6 +242,7 @@ function renderUsers() {
 
   elements.userList.innerHTML = filtered.map(userRow).join("");
   elements.userEmptyState.classList.toggle("hidden", filtered.length > 0);
+  updateUserStats();
 
   elements.userList.querySelectorAll("[data-toggle-user]").forEach((button) => {
     button.addEventListener("click", () => toggleUser(button.dataset.toggleUser, button.dataset.enabled === "true"));
@@ -247,7 +261,7 @@ function userRow(user) {
     <tr>
       <td>${escapeHtml(user.username)}</td>
       <td><span class="badge">${role}</span></td>
-      <td><span class="badge">${enabled ? "启用" : "禁用"}</span></td>
+      <td><span class="badge ${enabled ? "success" : "danger"}">${enabled ? "启用" : "禁用"}</span></td>
       <td>${escapeHtml(formatDate(updatedAt))}</td>
       <td>
         <div class="row-actions">
@@ -268,6 +282,8 @@ function showAdminPanel(panel) {
   elements.adminFilesPanel.classList.toggle("hidden", !showFiles);
   elements.adminUsersTab.classList.toggle("active", !showFiles);
   elements.adminFilesTab.classList.toggle("active", showFiles);
+  elements.adminUsersTab.setAttribute("aria-selected", String(!showFiles));
+  elements.adminFilesTab.setAttribute("aria-selected", String(showFiles));
 
   if (showFiles && state.adminFiles.length === 0) {
     loadAdminDirectory(state.adminCurrentPath);
@@ -288,6 +304,7 @@ async function loadDirectory(path) {
   try {
     state.files = await propfind(state.currentPath, 1);
     renderFiles();
+    updateFileStats();
   } catch (error) {
     showToast(error.message, true);
   }
@@ -461,6 +478,7 @@ function renderFiles() {
 
   elements.fileList.innerHTML = filtered.map(fileRow).join("");
   elements.emptyState.classList.toggle("hidden", filtered.length > 0);
+  updateFileStats();
 
   elements.fileList.querySelectorAll("[data-open]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -496,6 +514,7 @@ function renderAdminFiles() {
   const isEmpty = filtered.length === 0;
   elements.adminFileEmptyState.classList.toggle("hidden", !isEmpty);
   elements.adminFileEmptyState.querySelector("p").textContent = "当前目录为空";
+  updateAdminFileStats();
 
   elements.adminFileList.querySelectorAll("[data-admin-open]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -559,6 +578,7 @@ function renderBreadcrumbs() {
   });
 
   elements.backFolder.disabled = state.currentPath === "/";
+  updateFileStats();
 }
 
 function renderAdminBreadcrumbs() {
@@ -579,6 +599,7 @@ function renderAdminBreadcrumbs() {
   });
 
   elements.adminBackFolder.disabled = state.adminCurrentPath === "/";
+  updateAdminFileStats();
 }
 
 async function adminApi(path, options = {}) {
@@ -605,16 +626,26 @@ function showAdminView() {
   elements.loginView.classList.add("hidden");
   elements.filesView.classList.add("hidden");
   elements.adminView.classList.remove("hidden");
+  if (elements.adminAccountLabel) {
+    elements.adminAccountLabel.textContent = state.adminUsername ? `管理员：${state.adminUsername}` : "管理员";
+  }
+  updateUserStats();
+  updateAdminFileStats();
 }
 
 function showFilesView() {
   elements.loginView.classList.add("hidden");
   elements.adminView.classList.add("hidden");
   elements.filesView.classList.remove("hidden");
+  if (elements.currentUserLabel) {
+    elements.currentUserLabel.textContent = state.username ? `用户：${state.username}` : "普通用户";
+  }
+  updateFileStats();
 }
 
 function logout() {
   state.adminToken = "";
+  state.adminUsername = "";
   state.userAuth = "";
   state.username = "";
   state.currentPath = "/";
@@ -623,11 +654,29 @@ function logout() {
   state.adminFiles = [];
   state.users = [];
   sessionStorage.removeItem("webdavAdminToken");
+  sessionStorage.removeItem("webdavAdminUsername");
   sessionStorage.removeItem("webdavUserAuth");
   sessionStorage.removeItem("webdavUsername");
   elements.adminView.classList.add("hidden");
   elements.filesView.classList.add("hidden");
   elements.loginView.classList.remove("hidden");
+}
+
+function updateUserStats() {
+  if (elements.userCount) elements.userCount.textContent = String(state.users.length);
+  if (elements.enabledUserCount) {
+    elements.enabledUserCount.textContent = String(state.users.filter((user) => Boolean(user.enabled)).length);
+  }
+}
+
+function updateFileStats() {
+  if (elements.fileCount) elements.fileCount.textContent = String(state.files.length);
+  if (elements.currentPathLabel) elements.currentPathLabel.textContent = state.currentPath;
+}
+
+function updateAdminFileStats() {
+  if (elements.adminFileCount) elements.adminFileCount.textContent = String(state.adminFiles.length);
+  if (elements.adminCurrentPath) elements.adminCurrentPath.textContent = state.adminCurrentPath;
 }
 
 function davUrl(path) {
