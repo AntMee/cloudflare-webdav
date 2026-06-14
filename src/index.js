@@ -72,6 +72,10 @@ async function handleAdmin(request, env, url) {
     return adminListFiles(env, url, request, admin.username);
   }
 
+  if (request.method === "DELETE" && path === "/files") {
+    return adminDeleteEntry(env, url, request, admin.username);
+  }
+
   if (request.method === "GET" && path === "/files/download") {
     return adminDownloadFile(env, url, admin.username);
   }
@@ -174,6 +178,15 @@ async function adminDownloadFile(env, url, adminUsername) {
       etag: node.etag || "",
     },
   });
+}
+
+async function adminDeleteEntry(env, url, request, adminUsername) {
+  if (url.searchParams.has("userId")) return json({ error: "Admin can only access own files" }, 400, request);
+  const path = normalizeAdminFilePath(url.searchParams.get("path") || "/");
+  if (!path.ok) return json({ error: path.message }, path.status, request);
+
+  const user = await ensureAdminFileUser(env.DB, adminUsername);
+  return deleteEntry(env, user.id, path.path);
 }
 
 async function adminCreateFolder(request, env, adminUsername) {

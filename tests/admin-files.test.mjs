@@ -111,6 +111,27 @@ test("admin can create a folder in the admin account's file space", async () => 
   ]);
 });
 
+test("admin can delete a file in the admin account's file space", async () => {
+  const env = createTestEnv();
+  const token = await adminToken(env);
+
+  const deleteResponse = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2FDouyinBackup%2Fconfig_backup.json", {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(deleteResponse.status, 204);
+  assert.equal(env.KV.deletedKeys.includes("users/admin-user/DouyinBackup/config_backup.json"), true);
+
+  const listResponse = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2FDouyinBackup%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+  assert.equal(listResponse.status, 200);
+
+  const listBody = await listResponse.json();
+  assert.deepEqual(listBody.files.map((file) => file.name), ["SubFolder"]);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
@@ -160,19 +181,25 @@ function createTestEnv({ adminUsername = "admin", includeAdminUser = true, inclu
     node("/OtherUserOnly/", "directory", { owner_user_id: "user-1" }),
   ] : [];
 
+  const kv = {
+    deletedKeys: [],
+    async get(key, type) {
+      assert.equal(type, "arrayBuffer");
+      if (key !== "users/admin-user/DouyinBackup/config_backup.json") return null;
+      return new TextEncoder().encode('{"ok":true}').buffer;
+    },
+    async delete(key) {
+      this.deletedKeys.push(key);
+    },
+  };
+
   return {
     ADMIN_USERNAME: adminUsername,
     ADMIN_PASSWORD: "password",
     JWT_SECRET: "test-secret",
     SESSION_TTL_SECONDS: "43200",
     DB: new FakeD1({ users, nodes }),
-    KV: {
-      async get(key, type) {
-        assert.equal(type, "arrayBuffer");
-        if (key !== "users/admin-user/DouyinBackup/config_backup.json") return null;
-        return new TextEncoder().encode('{"ok":true}').buffer;
-      },
-    },
+    KV: kv,
     ASSETS: { fetch: () => new Response("Not Found", { status: 404 }) },
   };
 }
@@ -273,6 +300,12 @@ class FakeStatement {
         created_at: this.params[3],
         updated_at: this.params[4],
       });
+      return {};
+    }
+    if (this.sql.includes("DELETE FROM nodes WHERE owner_user_id = ? AND path = ?")) {
+      this.data.nodes = this.data.nodes.filter((node) => (
+        node.owner_user_id !== this.params[0] || node.path !== this.params[1]
+      ));
       return {};
     }
     return {};

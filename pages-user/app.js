@@ -455,6 +455,25 @@ async function adminDownloadFile(file) {
   }
 }
 
+async function adminDeleteEntry(file) {
+  if (!window.confirm(`确定删除 ${file.name}？`)) return;
+
+  try {
+    const query = new URLSearchParams({
+      path: file.path,
+    });
+    const response = await fetch(`/api/admin/files?${query.toString()}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${state.adminToken}` },
+    });
+    if (!response.ok) throw new Error(`删除失败：${response.status}`);
+    await loadAdminDirectory(state.adminCurrentPath);
+    showToast("已删除");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
 async function propfind(path, depth) {
   const response = await fetch(davUrl(path), {
     method: "PROPFIND",
@@ -561,12 +580,20 @@ function renderAdminFiles() {
       if (file) adminDownloadFile(file);
     });
   });
+
+  elements.adminFileList.querySelectorAll("[data-admin-delete]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const file = state.adminFiles.find((item) => item.path === button.dataset.adminDelete);
+      if (file) adminDeleteEntry(file);
+    });
+  });
 }
 
 function fileRow(file, options = {}) {
   const isDirectory = file.type === "directory";
   const openAttr = options.admin ? "data-admin-open" : "data-open";
   const downloadAttr = options.admin ? "data-admin-download" : "data-download";
+  const deleteAttr = options.admin ? "data-admin-delete" : "data-delete";
   return `
     <tr>
       <td>
@@ -583,7 +610,7 @@ function fileRow(file, options = {}) {
       <td>
         <div class="row-actions">
           ${isDirectory ? "" : `<button class="table-action" type="button" ${downloadAttr}="${escapeHtml(file.path)}">下载</button>`}
-          ${options.admin ? "" : `<button class="table-action danger" type="button" data-delete="${escapeHtml(file.path)}">删除</button>`}
+          <button class="table-action danger" type="button" ${deleteAttr}="${escapeHtml(file.path)}">删除</button>
         </div>
       </td>
     </tr>
