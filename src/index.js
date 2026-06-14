@@ -358,7 +358,14 @@ async function deleteEntry(env, userId, path) {
     const result = await env.DB.prepare("SELECT id, path FROM nodes WHERE owner_user_id = ? AND path != ?")
       .bind(userId, path)
       .all();
-    if (result.results.some((item) => isDescendant(path, item.path))) return text("Directory is not empty", 409);
+    const descendantPaths = result.results
+      .filter((item) => isDescendant(path, item.path))
+      .map((item) => item.path);
+    for (const childPath of descendantPaths) {
+      const child = await getNode(env.DB, userId, childPath);
+      if (child?.kind === "file" && child.kv_key) await env.KV.delete(child.kv_key);
+      await env.DB.prepare("DELETE FROM nodes WHERE owner_user_id = ? AND path = ?").bind(userId, childPath).run();
+    }
   }
 
   if (node.kind === "file" && node.kv_key) {

@@ -247,6 +247,67 @@ test("WebDAV PUT rejects uploads without a valid content length", async () => {
   assert.equal(response.status, 411);
 });
 
+test("WebDAV DELETE removes a non-empty folder only for the current user", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push(
+    {
+      id: "delete-user",
+      username: "delete-user",
+      password_hash: passwordHash,
+      role: "user",
+      enabled: 1,
+      created_at: "2026-06-14T01:00:00.000Z",
+      updated_at: "2026-06-14T01:59:00.000Z",
+    },
+    {
+      id: "other-delete-user",
+      username: "other-delete-user",
+      password_hash: passwordHash,
+      role: "user",
+      enabled: 1,
+      created_at: "2026-06-14T01:00:00.000Z",
+      updated_at: "2026-06-14T01:59:00.000Z",
+    },
+  );
+  env.DB.data.nodes.push(
+    node("/", "directory", { owner_user_id: "delete-user" }),
+    node("/DouyinBackup/", "directory", { owner_user_id: "delete-user" }),
+    node("/DouyinBackup/config.json", "file", {
+      owner_user_id: "delete-user",
+      kv_key: "users/delete-user/DouyinBackup/config.json",
+      size: 2,
+    }),
+    node("/DouyinBackup/Nested/", "directory", { owner_user_id: "delete-user" }),
+    node("/DouyinBackup/Nested/item.json", "file", {
+      owner_user_id: "delete-user",
+      kv_key: "users/delete-user/DouyinBackup/Nested/item.json",
+      size: 2,
+    }),
+    node("/", "directory", { owner_user_id: "other-delete-user" }),
+    node("/DouyinBackup/", "directory", { owner_user_id: "other-delete-user" }),
+    node("/DouyinBackup/other.json", "file", {
+      owner_user_id: "other-delete-user",
+      kv_key: "users/other-delete-user/DouyinBackup/other.json",
+      size: 2,
+    }),
+  );
+
+  const response = await worker.fetch(new Request("https://example.test/dav/DouyinBackup/", {
+    method: "DELETE",
+    headers: {
+      authorization: `Basic ${btoa("delete-user:user-password")}`,
+    },
+  }), env);
+
+  assert.equal(response.status, 204);
+  assert.equal(env.KV.deletedKeys.includes("users/delete-user/DouyinBackup/config.json"), true);
+  assert.equal(env.KV.deletedKeys.includes("users/delete-user/DouyinBackup/Nested/item.json"), true);
+  assert.equal(env.KV.deletedKeys.includes("users/other-delete-user/DouyinBackup/other.json"), false);
+  assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "delete-user" && item.path.startsWith("/DouyinBackup/")), false);
+  assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "other-delete-user" && item.path === "/DouyinBackup/other.json"), true);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
