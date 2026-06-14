@@ -25,6 +25,21 @@ test("admin can list only the admin account's file children", async () => {
   ]);
 });
 
+test("admin can log in with configured credentials", async () => {
+  const env = createTestEnv();
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "admin", password: "password" }),
+  }), env);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(typeof body.token, "string");
+  assert.equal(body.token.split(".").length, 3);
+});
+
 test("admin can download only the admin account's file from KV", async () => {
   const env = createTestEnv();
   const token = await adminToken(env);

@@ -45,7 +45,7 @@ async function handleAdmin(request, env, url) {
     const rateLimit = await checkLoginRateLimit(env, request, String(body.username || ""));
     if (!rateLimit.ok) return json({ error: "Too many login attempts" }, 429, request);
 
-    if (body.username !== env.ADMIN_USERNAME || body.password !== env.ADMIN_PASSWORD) {
+    if (!credentialsMatch(body.username, env.ADMIN_USERNAME) || !credentialsMatch(body.password, env.ADMIN_PASSWORD)) {
       await recordFailedLogin(env, request, String(body.username || ""));
       return json({ error: "Invalid credentials" }, 401, request);
     }
@@ -494,6 +494,12 @@ function parseBasicAuth(header) {
   } catch {
     return null;
   }
+}
+
+function credentialsMatch(actual, expected) {
+  const actualBytes = encoder.encode(String(actual || ""));
+  const expectedBytes = encoder.encode(String(expected || ""));
+  return expectedBytes.length > 0 && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 async function hashPassword(password) {
