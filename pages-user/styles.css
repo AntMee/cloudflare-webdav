@@ -360,10 +360,6 @@ select:focus {
   flex-wrap: wrap;
 }
 
-.admin-file-controls select {
-  min-width: 220px;
-}
-
 .admin-form {
   display: grid;
   width: 100%;
@@ -570,10 +566,6 @@ tbody tr:last-child td {
 
   .tab-button {
     flex: 1;
-  }
-
-  .admin-file-controls select {
-    min-width: 0;
   }
 
   .admin-form {

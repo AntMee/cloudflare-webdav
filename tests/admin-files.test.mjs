@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import worker from "../src/index.js";
 
-test("admin can list a user's direct file children", async () => {
+test("admin can list only the admin account's file children", async () => {
   const env = createTestEnv();
   const token = await adminToken(env);
 
-  const response = await worker.fetch(new Request("https://example.test/api/admin/files?userId=user-1&path=%2FDouyinBackup%2F", {
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2FDouyinBackup%2F", {
     headers: { authorization: `Bearer ${token}` },
   }), env);
 
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.deepEqual(body.user, { id: "user-1", username: "123456" });
+  assert.deepEqual(body.user, { id: "admin-user", username: "admin" });
   assert.equal(body.path, "/DouyinBackup/");
   assert.deepEqual(body.files.map((file) => ({
     name: file.name,
@@ -25,11 +25,11 @@ test("admin can list a user's direct file children", async () => {
   ]);
 });
 
-test("admin can download a user's file from KV", async () => {
+test("admin can download only the admin account's file from KV", async () => {
   const env = createTestEnv();
   const token = await adminToken(env);
 
-  const response = await worker.fetch(new Request("https://example.test/api/admin/files/download?userId=user-1&path=%2FDouyinBackup%2Fconfig_backup.json", {
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files/download?path=%2FDouyinBackup%2Fconfig_backup.json", {
     headers: { authorization: `Bearer ${token}` },
   }), env);
 
@@ -38,6 +38,32 @@ test("admin can download a user's file from KV", async () => {
   assert.equal(response.headers.get("content-length"), "18");
   assert.equal(response.headers.get("content-disposition"), 'attachment; filename="config_backup.json"');
   assert.equal(await response.text(), '{"ok":true}');
+});
+
+test("admin file API rejects userId override", async () => {
+  const env = createTestEnv();
+  const token = await adminToken(env);
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files?userId=user-1&path=%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(response.status, 400);
+});
+
+test("admin file API creates the admin account file space when missing", async () => {
+  const env = createTestEnv({ includeAdminUser: false, includeAdminFiles: false });
+  const token = await adminToken(env);
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files?path=%2F", {
+    headers: { authorization: `Bearer ${token}` },
+  }), env);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.username, "admin");
+  assert.equal(body.path, "/");
+  assert.deepEqual(body.files, []);
 });
 
 async function adminToken(env) {
@@ -50,8 +76,17 @@ async function adminToken(env) {
   return (await response.json()).token;
 }
 
-function createTestEnv() {
+function createTestEnv({ includeAdminUser = true, includeAdminFiles = true } = {}) {
   const users = [
+    ...(includeAdminUser ? [{
+      id: "admin-user",
+      username: "admin",
+      password_hash: "unused",
+      role: "admin",
+      enabled: 1,
+      created_at: "2026-06-14T01:00:00.000Z",
+      updated_at: "2026-06-14T01:59:00.000Z",
+    }] : []),
     {
       id: "user-1",
       username: "123456",
@@ -62,22 +97,23 @@ function createTestEnv() {
       updated_at: "2026-06-14T01:59:00.000Z",
     },
   ];
-  const nodes = [
+  const nodes = includeAdminFiles ? [
     node("/", "directory"),
     node("/DouyinBackup/", "directory"),
     node("/DouyinBackup/config_backup.json", "file", {
-      kv_key: "users/user-1/DouyinBackup/config_backup.json",
+      kv_key: "users/admin-user/DouyinBackup/config_backup.json",
       mime_type: "application/json",
       size: 18,
       etag: '"test"',
     }),
     node("/DouyinBackup/SubFolder/", "directory"),
     node("/DouyinBackup/SubFolder/nested.json", "file", {
-      kv_key: "users/user-1/DouyinBackup/SubFolder/nested.json",
+      kv_key: "users/admin-user/DouyinBackup/SubFolder/nested.json",
       mime_type: "application/json",
       size: 2,
     }),
-  ];
+    node("/OtherUserOnly/", "directory", { owner_user_id: "user-1" }),
+  ] : [];
 
   return {
     ADMIN_USERNAME: "admin",
@@ -88,7 +124,7 @@ function createTestEnv() {
     KV: {
       async get(key, type) {
         assert.equal(type, "arrayBuffer");
-        if (key !== "users/user-1/DouyinBackup/config_backup.json") return null;
+        if (key !== "users/admin-user/DouyinBackup/config_backup.json") return null;
         return new TextEncoder().encode('{"ok":true}').buffer;
       },
     },
@@ -99,7 +135,7 @@ function createTestEnv() {
 function node(path, kind, overrides = {}) {
   return {
     id: crypto.randomUUID(),
-    owner_user_id: "user-1",
+    owner_user_id: "admin-user",
     path,
     kind,
     kv_key: null,
@@ -142,6 +178,10 @@ class FakeStatement {
       const user = this.data.users.find((item) => item.id === this.params[0]);
       return user ? { id: user.id, username: user.username } : null;
     }
+    if (this.sql.includes("SELECT id, username FROM users WHERE username = ?")) {
+      const user = this.data.users.find((item) => item.username === this.params[0]);
+      return user ? { id: user.id, username: user.username } : null;
+    }
     if (this.sql.includes("SELECT * FROM nodes WHERE owner_user_id = ? AND path = ?")) {
       return this.data.nodes.find((node) => node.owner_user_id === this.params[0] && node.path === this.params[1]) || null;
     }
@@ -160,6 +200,36 @@ class FakeStatement {
   }
 
   async run() {
+    if (this.sql.includes("INSERT INTO users")) {
+      const role = this.sql.includes("'admin'") ? "admin" : this.params[3];
+      const createdAt = this.sql.includes("'admin'") ? this.params[3] : this.params[4];
+      const updatedAt = this.sql.includes("'admin'") ? this.params[4] : this.params[5];
+      this.data.users.push({
+        id: this.params[0],
+        username: this.params[1],
+        password_hash: this.params[2],
+        role,
+        enabled: 1,
+        created_at: createdAt,
+        updated_at: updatedAt,
+      });
+      return {};
+    }
+    if (this.sql.includes("INSERT INTO nodes")) {
+      this.data.nodes.push({
+        id: this.params[0],
+        owner_user_id: this.params[1],
+        path: this.params[2],
+        kind: "directory",
+        kv_key: null,
+        mime_type: null,
+        size: 0,
+        etag: null,
+        created_at: this.params[3],
+        updated_at: this.params[4],
+      });
+      return {};
+    }
     return {};
   }
 }

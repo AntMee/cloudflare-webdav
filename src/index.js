@@ -69,11 +69,11 @@ async function handleAdmin(request, env, url) {
   }
 
   if (request.method === "GET" && path === "/files") {
-    return adminListFiles(env, url, request);
+    return adminListFiles(env, url, request, admin.username);
   }
 
   if (request.method === "GET" && path === "/files/download") {
-    return adminDownloadFile(env, url);
+    return adminDownloadFile(env, url, admin.username);
   }
 
   if (request.method === "POST" && path === "/users") {
@@ -123,17 +123,15 @@ async function handleAdmin(request, env, url) {
   return text("Method Not Allowed", 405, { allow: "GET, POST, PATCH" });
 }
 
-async function adminListFiles(env, url, request) {
-  const userId = String(url.searchParams.get("userId") || "");
+async function adminListFiles(env, url, request, adminUsername) {
+  if (url.searchParams.has("userId")) return json({ error: "Admin can only access own files" }, 400, request);
   const path = normalizeAdminFilePath(url.searchParams.get("path") || "/");
-  if (!userId) return json({ error: "Missing userId" }, 400, request);
   if (!path.ok) return json({ error: path.message }, path.status, request);
 
-  const user = await getUserSummary(env.DB, userId);
-  if (!user) return json({ error: "User not found" }, 404, request);
+  const user = await ensureAdminFileUser(env.DB, adminUsername);
 
-  await ensureRoot(env.DB, userId);
-  const node = await getNode(env.DB, userId, path.path);
+  await ensureRoot(env.DB, user.id);
+  const node = await getNode(env.DB, user.id, path.path);
   if (!node || node.kind !== "directory") return json({ error: "Directory not found" }, 404, request);
 
   const result = await env.DB.prepare(
@@ -141,7 +139,7 @@ async function adminListFiles(env, url, request) {
      WHERE owner_user_id = ?
        AND path != ?
      ORDER BY kind ASC, path ASC`,
-  ).bind(userId, path.path).all();
+  ).bind(user.id, path.path).all();
 
   const files = result.results
     .filter((item) => isDirectChild(path.path, item.path))
@@ -151,16 +149,14 @@ async function adminListFiles(env, url, request) {
   return json({ user, path: path.path, files }, 200, request);
 }
 
-async function adminDownloadFile(env, url) {
-  const userId = String(url.searchParams.get("userId") || "");
+async function adminDownloadFile(env, url, adminUsername) {
+  if (url.searchParams.has("userId")) return json({ error: "Admin can only access own files" }, 400);
   const path = normalizeAdminFilePath(url.searchParams.get("path") || "/");
-  if (!userId) return json({ error: "Missing userId" }, 400);
   if (!path.ok) return json({ error: path.message }, path.status);
 
-  const user = await getUserSummary(env.DB, userId);
-  if (!user) return json({ error: "User not found" }, 404);
+  const user = await ensureAdminFileUser(env.DB, adminUsername);
 
-  const node = await getNode(env.DB, userId, path.path);
+  const node = await getNode(env.DB, user.id, path.path);
   if (!node || node.kind !== "file" || !node.kv_key) return text("Not Found", 404);
 
   const file = await env.KV.get(node.kv_key, "arrayBuffer");
@@ -352,12 +348,30 @@ function getUserSummary(db, userId) {
   return db.prepare("SELECT id, username FROM users WHERE id = ?").bind(userId).first();
 }
 
+function getUserSummaryByUsername(db, username) {
+  return db.prepare("SELECT id, username FROM users WHERE username = ?").bind(username).first();
+}
+
+async function ensureAdminFileUser(db, username) {
+  let user = await getUserSummaryByUsername(db, username);
+  if (user) return user;
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await db.prepare(
+    "INSERT INTO users (id, username, password_hash, role, enabled, created_at, updated_at) VALUES (?, ?, ?, 'admin', 1, ?, ?)",
+  ).bind(id, username, "external-admin-login", now, now).run();
+  user = { id, username };
+  await ensureRoot(db, id);
+  return user;
+}
+
 async function requireAdmin(request, env) {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return { ok: false, status: 401, error: "Unauthorized" };
   const payload = await verifyJwt(header.slice("Bearer ".length), env.JWT_SECRET);
   if (!payload || payload.role !== "admin") return { ok: false, status: 403, error: "Forbidden" };
-  return { ok: true };
+  return { ok: true, username: String(payload.sub || "") };
 }
 
 function parseBasicAuth(header) {

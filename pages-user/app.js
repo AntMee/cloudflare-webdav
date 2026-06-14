@@ -5,7 +5,6 @@ const state = {
   currentPath: "/",
   adminCurrentPath: "/",
   adminPanel: "users",
-  adminSelectedUserId: "",
   files: [],
   adminFiles: [],
   users: [],
@@ -26,7 +25,6 @@ const elements = {
   userSearch: document.querySelector("#user-search"),
   userList: document.querySelector("#user-list"),
   userEmptyState: document.querySelector("#user-empty-state"),
-  adminFileUser: document.querySelector("#admin-file-user"),
   adminBackFolder: document.querySelector("#admin-back-folder"),
   adminRefreshFiles: document.querySelector("#admin-refresh-files"),
   adminFileBreadcrumbs: document.querySelector("#admin-file-breadcrumbs"),
@@ -54,7 +52,6 @@ elements.adminLogoutButton.addEventListener("click", logout);
 elements.adminUsersTab.addEventListener("click", () => showAdminPanel("users"));
 elements.adminFilesTab.addEventListener("click", () => showAdminPanel("files"));
 elements.userSearch.addEventListener("input", renderUsers);
-elements.adminFileUser.addEventListener("change", handleAdminFileUserChange);
 elements.adminBackFolder.addEventListener("click", goBackAdminFolder);
 elements.adminRefreshFiles.addEventListener("click", () => loadAdminDirectory(state.adminCurrentPath));
 elements.adminFileSearch.addEventListener("input", renderAdminFiles);
@@ -137,7 +134,6 @@ async function loadUsers() {
     const body = await adminApi("/api/admin/users");
     state.users = Array.isArray(body.users) ? body.users : [];
     renderUsers();
-    syncAdminFileUsers();
   } catch (error) {
     if (error.status === 401 || error.status === 403) logout();
     showToast(error.message, true);
@@ -174,40 +170,10 @@ async function handleCreateUser(event) {
   }
 }
 
-function syncAdminFileUsers() {
-  elements.adminFileUser.innerHTML = state.users.map((user) => (
-    `<option value="${escapeHtml(user.id)}">${escapeHtml(user.username)}</option>`
-  )).join("");
-
-  if (!state.users.some((user) => user.id === state.adminSelectedUserId)) {
-    state.adminSelectedUserId = state.users[0]?.id || "";
-    state.adminCurrentPath = "/";
-  }
-
-  elements.adminFileUser.value = state.adminSelectedUserId;
-  if (!state.adminSelectedUserId) {
-    state.adminFiles = [];
-    renderAdminFiles();
-  }
-}
-
-async function handleAdminFileUserChange() {
-  state.adminSelectedUserId = elements.adminFileUser.value;
-  state.adminCurrentPath = "/";
-  await loadAdminDirectory("/");
-}
-
 async function loadAdminDirectory(path) {
-  if (!state.adminSelectedUserId) {
-    state.adminFiles = [];
-    renderAdminFiles();
-    return;
-  }
-
   state.adminCurrentPath = ensureDirectory(path);
   try {
     const query = new URLSearchParams({
-      userId: state.adminSelectedUserId,
       path: state.adminCurrentPath,
     });
     const body = await adminApi(`/api/admin/files?${query.toString()}`);
@@ -270,9 +236,6 @@ function renderUsers() {
   elements.userList.querySelectorAll("[data-reset-user]").forEach((button) => {
     button.addEventListener("click", () => resetPassword(button.dataset.resetUser));
   });
-  elements.userList.querySelectorAll("[data-view-files]").forEach((button) => {
-    button.addEventListener("click", () => openAdminFilesForUser(button.dataset.viewFiles));
-  });
 }
 
 function userRow(user) {
@@ -292,19 +255,10 @@ function userRow(user) {
             ${enabled ? "禁用" : "启用"}
           </button>
           <button class="table-action" type="button" data-reset-user="${escapeHtml(user.id)}">重置密码</button>
-          <button class="table-action" type="button" data-view-files="${escapeHtml(user.id)}">查看文件</button>
         </div>
       </td>
     </tr>
   `;
-}
-
-async function openAdminFilesForUser(userId) {
-  state.adminSelectedUserId = userId;
-  state.adminCurrentPath = "/";
-  elements.adminFileUser.value = userId;
-  showAdminPanel("files");
-  await loadAdminDirectory("/");
 }
 
 function showAdminPanel(panel) {
@@ -315,7 +269,7 @@ function showAdminPanel(panel) {
   elements.adminUsersTab.classList.toggle("active", !showFiles);
   elements.adminFilesTab.classList.toggle("active", showFiles);
 
-  if (showFiles && state.adminSelectedUserId && state.adminFiles.length === 0) {
+  if (showFiles && state.adminFiles.length === 0) {
     loadAdminDirectory(state.adminCurrentPath);
   }
 }
@@ -432,10 +386,8 @@ async function deleteEntry(file) {
 }
 
 async function adminDownloadFile(file) {
-  if (!state.adminSelectedUserId) return;
   try {
     const query = new URLSearchParams({
-      userId: state.adminSelectedUserId,
       path: file.path,
     });
     const response = await fetch(`/api/admin/files/download?${query.toString()}`, {
@@ -541,9 +493,9 @@ function renderAdminFiles() {
   filtered.sort(sortFiles);
 
   elements.adminFileList.innerHTML = filtered.map((file) => fileRow(file, { admin: true })).join("");
-  const isEmpty = !state.adminSelectedUserId || filtered.length === 0;
+  const isEmpty = filtered.length === 0;
   elements.adminFileEmptyState.classList.toggle("hidden", !isEmpty);
-  elements.adminFileEmptyState.querySelector("p").textContent = state.adminSelectedUserId ? "当前目录为空" : "请选择用户";
+  elements.adminFileEmptyState.querySelector("p").textContent = "当前目录为空";
 
   elements.adminFileList.querySelectorAll("[data-admin-open]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -626,7 +578,7 @@ function renderAdminBreadcrumbs() {
     button.addEventListener("click", () => loadAdminDirectory(button.dataset.adminPath));
   });
 
-  elements.adminBackFolder.disabled = state.adminCurrentPath === "/" || !state.adminSelectedUserId;
+  elements.adminBackFolder.disabled = state.adminCurrentPath === "/";
 }
 
 async function adminApi(path, options = {}) {
@@ -667,7 +619,6 @@ function logout() {
   state.username = "";
   state.currentPath = "/";
   state.adminCurrentPath = "/";
-  state.adminSelectedUserId = "";
   state.files = [];
   state.adminFiles = [];
   state.users = [];
