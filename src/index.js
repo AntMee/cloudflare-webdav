@@ -5,7 +5,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (request.method === "OPTIONS") {
+    if (request.method === "OPTIONS" && !url.pathname.startsWith("/dav")) {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
@@ -223,6 +223,10 @@ async function adminCreateFolder(request, env, adminUsername) {
 }
 
 async function handleWebDav(request, env, url) {
+  if (request.method === "OPTIONS") {
+    return webDavOptions(request);
+  }
+
   const auth = parseBasicAuth(request.headers.get("authorization"));
   if (!auth) return unauthorized(request);
 
@@ -241,7 +245,7 @@ async function handleWebDav(request, env, url) {
     return propfind(env, user.id, path.path, request.headers.get("depth") || "1", url.origin);
   }
   if (request.method === "GET" || request.method === "HEAD") {
-    return getFile(env, user.id, path.path, request.method === "HEAD");
+    return getFile(env, user.id, path.path, request.method === "HEAD", url.origin);
   }
   if (request.method === "PUT") {
     return putFile(request, env, user.id, path.path);
@@ -254,6 +258,16 @@ async function handleWebDav(request, env, url) {
   }
 
   return text("Not Implemented", 501);
+}
+
+function webDavOptions(request) {
+  return withCors(new Response(null, {
+    status: 204,
+    headers: {
+      allow: "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE",
+      dav: "1",
+    },
+  }), request);
 }
 
 async function propfind(env, userId, path, depth, origin) {
@@ -280,8 +294,9 @@ async function propfind(env, userId, path, depth, origin) {
   });
 }
 
-async function getFile(env, userId, path, headOnly) {
+async function getFile(env, userId, path, headOnly, origin = "") {
   const node = await getNode(env.DB, userId, path);
+  if (node?.kind === "directory") return redirectToDirectoryPath(path, origin);
   if (!node || node.kind !== "file" || !node.kv_key) return text("Not Found", 404);
   const file = await env.KV.get(node.kv_key, "arrayBuffer");
   if (!file) return text("Not Found", 404);
@@ -291,6 +306,14 @@ async function getFile(env, userId, path, headOnly) {
       "content-length": String(node.size || file.byteLength),
       etag: node.etag || "",
     },
+  });
+}
+
+function redirectToDirectoryPath(path, origin) {
+  const href = `${origin}/dav${path === "/" ? "/" : path}`;
+  return new Response(null, {
+    status: 301,
+    headers: { location: href },
   });
 }
 

@@ -308,6 +308,43 @@ test("WebDAV DELETE removes a non-empty folder only for the current user", async
   assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "other-delete-user" && item.path === "/DouyinBackup/other.json"), true);
 });
 
+test("WebDAV OPTIONS advertises DAV support for clients", async () => {
+  const env = createTestEnv();
+
+  const response = await worker.fetch(new Request("https://example.test/dav", {
+    method: "OPTIONS",
+  }), env);
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("dav"), "1");
+  assert.match(response.headers.get("allow") || "", /PROPFIND/);
+});
+
+test("WebDAV GET on a directory redirects clients to the canonical slash path", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "directory-user",
+    username: "directory-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+  env.DB.data.nodes.push(node("/", "directory", { owner_user_id: "directory-user" }));
+
+  const response = await worker.fetch(new Request("https://example.test/dav", {
+    method: "GET",
+    headers: {
+      authorization: `Basic ${btoa("directory-user:user-password")}`,
+    },
+  }), env);
+
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get("location"), "https://example.test/dav/");
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
