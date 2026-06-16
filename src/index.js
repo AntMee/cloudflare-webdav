@@ -17,6 +17,10 @@ export default {
         return json({ ok: true }, 200, request);
       }
 
+      if (url.pathname === "/robots.txt") {
+        return withSecurityHeaders(text("User-agent: *\nDisallow: /\n", 200));
+      }
+
       if (url.pathname.startsWith("/api/admin")) {
         return withCors(await handleAdmin(request, env, url), request);
       }
@@ -26,7 +30,7 @@ export default {
       }
 
       if (request.method === "GET" || request.method === "HEAD") {
-        return env.ASSETS.fetch(request);
+        return withSecurityHeaders(await env.ASSETS.fetch(request));
       }
 
       return withCors(text("Not Found", 404), request);
@@ -693,6 +697,22 @@ function withCors(response, request) {
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(corsHeaders(request))) headers.set(key, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(securityHeaders())) headers.set(key, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+function securityHeaders() {
+  return {
+    "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "x-robots-tag": "noindex, nofollow, noarchive",
+  };
 }
 
 function corsHeaders(request) {

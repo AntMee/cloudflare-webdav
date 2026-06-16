@@ -4,11 +4,13 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "build:assets": "node scripts/build-assets.mjs",
     "prepare:cloudflare": "node .github/workflows/prepare-cloudflare.mjs",
-    "deploy": "npm run prepare:cloudflare && wrangler d1 migrations apply webdav_db --remote && wrangler deploy --keep-vars",
-    "check": "node --check src/index.js"
+    "deploy": "npm run build:assets && npm run prepare:cloudflare && wrangler d1 migrations apply webdav_db --remote && wrangler deploy --keep-vars",
+    "check": "node --check src/index.js && node --check pages-user/app.js && node --check pages-admin/app.js && node --check scripts/build-assets.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.27.1",
     "wrangler": "latest"
   }
 }

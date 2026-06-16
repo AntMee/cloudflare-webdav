@@ -3,7 +3,7 @@
   "name": "cloudflare-webdav",
   "main": "src/index.js",
   "assets": {
-    "directory": "./pages-user",
+    "directory": "./dist/pages-user",
     "binding": "ASSETS"
   },
   "compatibility_date": "2026-06-13",

@@ -360,6 +360,34 @@ test("WebDAV GET on a directory redirects clients to the canonical slash path", 
   assert.equal(response.headers.get("location"), "https://example.test/dav/");
 });
 
+test("static assets include browser security headers", async () => {
+  const env = createTestEnv({
+    assetsFetch: () => new Response("<!doctype html>", {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    }),
+  });
+
+  const response = await worker.fetch(new Request("https://example.test/"), env);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
+  assert.match(response.headers.get("content-security-policy") || "", /script-src 'self'/);
+});
+
+test("robots.txt blocks crawler indexing", async () => {
+  const env = createTestEnv();
+
+  const response = await worker.fetch(new Request("https://example.test/robots.txt"), env);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow, noarchive");
+  assert.match(await response.text(), /Disallow: \//);
+});
+
 async function adminToken(env, { username = "admin", password = "password" } = {}) {
   const response = await worker.fetch(new Request("https://example.test/api/admin/login", {
     method: "POST",
@@ -389,6 +417,7 @@ function createTestEnv({
   includeAdminFiles = true,
   users: extraUsers = [],
   nodes: extraNodes = [],
+  assetsFetch = () => new Response("Not Found", { status: 404 }),
 } = {}) {
   const users = [
     ...(includeAdminUser ? [{
@@ -456,7 +485,7 @@ function createTestEnv({
     ALLOWED_ORIGINS: "https://example.test",
     DB: new FakeD1({ users, nodes }),
     KV: kv,
-    ASSETS: { fetch: () => new Response("Not Found", { status: 404 }) },
+    ASSETS: { fetch: assetsFetch },
   };
 }
 
