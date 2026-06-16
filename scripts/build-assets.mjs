@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { build, transform } from "esbuild";
+import { build } from "esbuild";
 
 const sourceDir = new URL("../pages-user/", import.meta.url);
 const outputDir = new URL("../dist/pages-user/", import.meta.url);
@@ -9,11 +9,7 @@ await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 
 const html = await readFile(new URL("index.html", sourceDir), "utf8");
-const minifiedHtml = await transform(html, {
-  loader: "html",
-  minify: true,
-});
-await writeFile(new URL("index.html", outputDir), minifiedHtml.code);
+await writeFile(new URL("index.html", outputDir), minifyHtml(html));
 
 await build({
   entryPoints: [fileURLToPath(new URL("app.js", sourceDir))],
@@ -32,3 +28,10 @@ await build({
   minify: true,
   legalComments: "none",
 });
+
+function minifyHtml(value) {
+  return value
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/>\s+</g, "><")
+    .trim();
+}
