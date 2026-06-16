@@ -1,5 +1,5 @@
 const state = {
-  token: localStorage.getItem("webdavAdminToken") || "",
+  token: sessionStorage.getItem("webdavAdminToken") || "",
   users: [],
   resetUserId: "",
 };
@@ -59,7 +59,7 @@ async function handleLogin(event) {
     });
 
     state.token = body.token;
-    localStorage.setItem("webdavAdminToken", state.token);
+    sessionStorage.setItem("webdavAdminToken", state.token);
     elements.loginForm.reset();
     showDashboard();
     await loadUsers();
@@ -242,7 +242,7 @@ function showDashboard() {
 
 function showPreviewDashboard() {
   state.token = "preview-token";
-  localStorage.setItem("webdavAdminToken", state.token);
+  sessionStorage.setItem("webdavAdminToken", state.token);
   showDashboard();
   seedPreviewUsers();
   showToast("当前是前端预览数据，未连接后端 API");
@@ -278,7 +278,7 @@ function seedPreviewUsers() {
 function logout() {
   state.token = "";
   state.users = [];
-  localStorage.removeItem("webdavAdminToken");
+  sessionStorage.removeItem("webdavAdminToken");
   elements.dashboardView.classList.add("hidden");
   elements.loginView.classList.remove("hidden");
   renderUsers();
