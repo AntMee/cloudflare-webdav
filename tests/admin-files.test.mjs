@@ -237,6 +237,87 @@ test("admin login is rate limited after repeated failures", async () => {
   assert.equal(limited.status, 429);
 });
 
+test("WebDAV Basic auth is rate limited after repeated failures", async () => {
+  const env = createTestEnv();
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "rate-limit-user",
+    username: "rate-limit-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await worker.fetch(new Request("https://example.test/dav/", {
+      method: "PROPFIND",
+      headers: {
+        authorization: `Basic ${btoa("rate-limit-user:wrong-password")}`,
+        "cf-connecting-ip": "203.0.113.20",
+      },
+    }), env);
+    assert.equal(response.status, 401);
+  }
+
+  const limited = await worker.fetch(new Request("https://example.test/dav/", {
+    method: "PROPFIND",
+    headers: {
+      authorization: `Basic ${btoa("rate-limit-user:wrong-password")}`,
+      "cf-connecting-ip": "203.0.113.20",
+    },
+  }), env);
+
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.has("www-authenticate"), false);
+});
+
+test("WebDAV Basic auth clears rate limit after a successful login", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "clear-limit-user",
+    username: "clear-limit-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+  env.DB.data.nodes.push(node("/", "directory", { owner_user_id: "clear-limit-user" }));
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await worker.fetch(new Request("https://example.test/dav/", {
+      method: "PROPFIND",
+      headers: {
+        authorization: `Basic ${btoa("clear-limit-user:wrong-password")}`,
+        "cf-connecting-ip": "203.0.113.21",
+      },
+    }), env);
+    assert.equal(response.status, 401);
+  }
+
+  const successful = await worker.fetch(new Request("https://example.test/dav/", {
+    method: "PROPFIND",
+    headers: {
+      authorization: `Basic ${btoa("clear-limit-user:user-password")}`,
+      "cf-connecting-ip": "203.0.113.21",
+    },
+  }), env);
+  assert.equal(successful.status, 207);
+
+  const nextFailure = await worker.fetch(new Request("https://example.test/dav/", {
+    method: "PROPFIND",
+    headers: {
+      authorization: `Basic ${btoa("clear-limit-user:wrong-password")}`,
+      "cf-connecting-ip": "203.0.113.21",
+    },
+  }), env);
+
+  assert.equal(nextFailure.status, 401);
+});
+
 test("WebDAV PUT rejects uploads without a valid content length", async () => {
   const env = createTestEnv();
   const passwordHash = await createPasswordHash("user-password");

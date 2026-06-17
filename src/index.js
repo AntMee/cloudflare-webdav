@@ -234,12 +234,17 @@ async function handleWebDav(request, env, url) {
   const auth = parseBasicAuth(request.headers.get("authorization"));
   if (!auth) return unauthorized(request);
 
+  const rateLimit = await checkWebDavRateLimit(env, request, auth.username);
+  if (!rateLimit.ok) return text("Too Many Requests", 429, { "retry-after": "600" });
+
   const user = await env.DB.prepare("SELECT * FROM users WHERE username = ? AND enabled = 1")
     .bind(auth.username)
     .first();
   if (!user || !(await verifyPassword(auth.password, user.password_hash))) {
+    await recordFailedWebDavLogin(env, request, auth.username);
     return unauthorized(request);
   }
+  await clearFailedWebDavLogin(env, request, auth.username);
 
   await ensureRoot(env.DB, user.id);
   const path = normalizeDavPath(url.pathname);
@@ -486,6 +491,27 @@ async function clearFailedLogin(env, request, username) {
 function loginRateLimitKey(request, username) {
   const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
   return `rate-limit/admin-login/${ip}/${String(username || "").slice(0, 128)}`;
+}
+
+async function checkWebDavRateLimit(env, request, username) {
+  const key = webDavRateLimitKey(request, username);
+  const attempts = Number(await env.KV.get(key)) || 0;
+  return { ok: attempts < 5 };
+}
+
+async function recordFailedWebDavLogin(env, request, username) {
+  const key = webDavRateLimitKey(request, username);
+  const attempts = (Number(await env.KV.get(key)) || 0) + 1;
+  await env.KV.put(key, String(attempts), { expirationTtl: 600 });
+}
+
+async function clearFailedWebDavLogin(env, request, username) {
+  await env.KV.delete(webDavRateLimitKey(request, username));
+}
+
+function webDavRateLimitKey(request, username) {
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+  return `rate-limit/webdav-login/${ip}/${String(username || "").slice(0, 128)}`;
 }
 
 function parseBasicAuth(header) {
