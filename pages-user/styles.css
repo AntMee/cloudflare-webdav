@@ -917,8 +917,8 @@ tbody tr:last-child td {
 
 @media (max-width: 640px) {
   .app-shell {
-    width: min(100% - 18px, 560px);
-    padding: 12px 0;
+    width: min(100% - 14px, 560px);
+    padding: 8px 0;
   }
 
   h1 {
@@ -930,16 +930,45 @@ tbody tr:last-child td {
   }
 
   .login-copy h1 {
-    font-size: 30px;
+    font-size: 25px;
   }
 
   .login-brief,
   .login-panel {
-    padding: 22px;
+    padding: 18px;
+  }
+
+  .login-brief {
+    gap: 14px;
   }
 
   .system-list {
-    grid-template-columns: 1fr;
+    display: none;
+  }
+
+  .login-copy p {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+  }
+
+  .brand-mark svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .panel-title {
+    margin-bottom: 16px;
+  }
+
+  .field {
+    gap: 6px;
+    margin-bottom: 12px;
   }
 
   .app-header {
