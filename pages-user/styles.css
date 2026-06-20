@@ -987,10 +987,7 @@ tbody tr:last-child td {
     flex-direction: column;
   }
 
-  .header-actions .ghost-button,
-  .toolbar-actions .ghost-button,
-  .folder-form .primary-button,
-  .upload-button {
+  .header-actions .ghost-button {
     flex: 1 1 150px;
   }
 
@@ -1023,6 +1020,7 @@ tbody tr:last-child td {
   .folder-form .primary-button,
   .upload-button {
     width: 100%;
+    flex: 0 0 auto;
   }
 
   .admin-form {
