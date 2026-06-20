@@ -1011,12 +1011,34 @@ tbody tr:last-child td {
 
   .app-header {
     position: static;
-    align-items: stretch;
+    align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+  }
+
+  .header-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .header-actions .status-pill {
+    justify-content: flex-start;
+    max-width: none;
+    min-height: 32px;
   }
 
   .header-actions .ghost-button {
-    flex: 1 1 150px;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .header-actions .ghost-button svg {
+    width: 15px;
+    height: 15px;
   }
 
   .admin-tabs {
