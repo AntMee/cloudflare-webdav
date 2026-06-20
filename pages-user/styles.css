@@ -1001,14 +1001,27 @@ tbody tr:last-child td {
     padding: 14px;
   }
 
+  .pathbar,
   .toolbar {
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 10px;
+    position: sticky;
+    z-index: 8;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
   }
 
   .pathbar {
+    top: 0;
+    margin-bottom: 6px;
+    padding: 8px;
+  }
+
+  .toolbar {
+    top: 48px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
     margin-bottom: 8px;
+    padding: 10px;
   }
 
   .metric-strip {
@@ -1023,11 +1036,19 @@ tbody tr:last-child td {
 
   .folder-form,
   .toolbar-actions {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
   }
 
+  .folder-form input {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar-actions .ghost-button,
   .folder-form .primary-button,
   .upload-button {
     width: 100%;
@@ -1038,6 +1059,7 @@ tbody tr:last-child td {
   .folder-form .primary-button,
   .upload-button {
     min-height: 38px;
+    padding: 0 10px;
   }
 
   .admin-form {
