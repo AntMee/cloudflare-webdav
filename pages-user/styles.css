@@ -860,8 +860,22 @@ tbody tr:last-child td {
 
   .login-brief {
     min-height: auto;
+    gap: 18px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+    padding: 24px;
+  }
+
+  .system-list {
+    display: none;
+  }
+
+  .login-panel {
+    padding: 24px;
+  }
+
+  .panel-title {
+    margin-bottom: 18px;
   }
 
   .workspace {
@@ -940,10 +954,6 @@ tbody tr:last-child td {
 
   .login-brief {
     gap: 14px;
-  }
-
-  .system-list {
-    display: none;
   }
 
   .login-copy p {
