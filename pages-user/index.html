@@ -225,53 +225,58 @@
                 </div>
               </section>
 
-              <section class="toolbar admin-file-toolbar" aria-label="管理员文件操作">
-                <div class="toolbar-actions">
-                  <button class="ghost-button" id="admin-back-folder" type="button">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M19 12H5" />
-                      <path d="m12 19-7-7 7-7" />
-                    </svg>
-                    <span>返回上一级</span>
-                  </button>
-                  <button class="ghost-button" id="admin-refresh-files" type="button">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M21 12a9 9 0 0 1-9 9 9.4 9.4 0 0 1-6.4-2.5" />
-                      <path d="M3 12a9 9 0 0 1 15.4-6.4" />
-                      <path d="M18 2v4h-4" />
-                      <path d="M6 22v-4h4" />
-                    </svg>
-                    <span>刷新文件</span>
-                  </button>
+              <nav class="breadcrumbs pathbar" id="admin-file-breadcrumbs" aria-label="管理员当前目录"></nav>
+
+              <section class="file-section" aria-labelledby="admin-file-list-title">
+                <div class="section-heading row-heading file-list-heading">
+                  <div>
+                    <h2 id="admin-file-list-title">文件列表</h2>
+                    <p class="muted">管理员账号的私有目录。</p>
+                  </div>
+                  <div class="file-list-tools">
+                    <button class="ghost-button" id="admin-back-folder" type="button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M19 12H5" />
+                        <path d="m12 19-7-7 7-7" />
+                      </svg>
+                      <span>返回</span>
+                    </button>
+                    <button class="ghost-button" id="admin-refresh-files" type="button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M21 12a9 9 0 0 1-9 9 9.4 9.4 0 0 1-6.4-2.5" />
+                        <path d="M3 12a9 9 0 0 1 15.4-6.4" />
+                        <path d="M18 2v4h-4" />
+                        <path d="M6 22v-4h4" />
+                      </svg>
+                      <span>刷新</span>
+                    </button>
+                    <button class="ghost-button" id="admin-show-folder-form" type="button" aria-expanded="false" aria-controls="admin-folder-form">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5v14" />
+                        <path d="M5 12h14" />
+                      </svg>
+                      <span>新建</span>
+                    </button>
+                  </div>
                 </div>
-                <form class="folder-form" id="admin-folder-form">
+                <form class="folder-form inline-folder-form hidden" id="admin-folder-form">
                   <input id="admin-folder-name" name="folderName" placeholder="新建文件夹名称" autocomplete="off" required />
                   <button class="primary-button inline" id="admin-create-folder-button" type="submit">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M12 5v14" />
                       <path d="M5 12h14" />
                     </svg>
-                    <span>新建文件夹</span>
+                    <span>创建</span>
                   </button>
                 </form>
-                <nav class="breadcrumbs" id="admin-file-breadcrumbs" aria-label="管理员当前目录"></nav>
-              </section>
-
-              <section class="file-section" aria-labelledby="admin-file-list-title">
-                <div class="section-heading row-heading">
-                  <div>
-                    <h2 id="admin-file-list-title">文件列表</h2>
-                    <p class="muted">管理员账号的私有目录。</p>
-                  </div>
-                  <label class="search-field">
-                    <span class="sr-only">搜索我的文件</span>
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="m21 21-4.35-4.35" />
-                      <circle cx="11" cy="11" r="7" />
-                    </svg>
-                    <input id="admin-file-search" placeholder="搜索当前目录" autocomplete="off" />
-                  </label>
-                </div>
+                <label class="search-field file-search-inline">
+                  <span class="sr-only">搜索我的文件</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m21 21-4.35-4.35" />
+                    <circle cx="11" cy="11" r="7" />
+                  </svg>
+                  <input id="admin-file-search" placeholder="搜索当前目录" autocomplete="off" />
+                </label>
 
                 <div class="table-wrap">
                   <table>
@@ -349,52 +354,56 @@
 
             <nav class="breadcrumbs pathbar" id="breadcrumbs" aria-label="当前位置"></nav>
 
-            <section class="toolbar" aria-label="文件操作">
-              <div class="toolbar-actions">
-                <button class="ghost-button" id="back-folder" type="button">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M19 12H5" />
-                    <path d="m12 19-7-7 7-7" />
-                  </svg>
-                  <span>返回上一级</span>
-                </button>
-                <label class="upload-button">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 16V4" />
-                    <path d="m7 9 5-5 5 5" />
-                    <path d="M5 20h14" />
-                  </svg>
-                  <span>上传文件</span>
-                  <input id="file-input" type="file" multiple />
-                </label>
+            <section class="file-section" aria-labelledby="file-list-title">
+              <div class="section-heading row-heading file-list-heading">
+                <div>
+                  <h2 id="file-list-title">文件列表</h2>
+                  <p class="muted">当前账号的私有目录。</p>
+                </div>
+                <div class="file-list-tools">
+                  <button class="ghost-button" id="back-folder" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M19 12H5" />
+                      <path d="m12 19-7-7 7-7" />
+                    </svg>
+                    <span>返回</span>
+                  </button>
+                  <label class="upload-button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 16V4" />
+                      <path d="m7 9 5-5 5 5" />
+                      <path d="M5 20h14" />
+                    </svg>
+                    <span>上传</span>
+                    <input id="file-input" type="file" multiple />
+                  </label>
+                  <button class="ghost-button" id="show-folder-form" type="button" aria-expanded="false" aria-controls="folder-form">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 5v14" />
+                      <path d="M5 12h14" />
+                    </svg>
+                    <span>新建</span>
+                  </button>
+                </div>
               </div>
-              <form class="folder-form" id="folder-form">
+              <form class="folder-form inline-folder-form hidden" id="folder-form">
                 <input id="folder-name" name="folderName" placeholder="新建文件夹名称" autocomplete="off" required />
                 <button class="primary-button inline" id="create-folder-button" type="submit">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
                   </svg>
-                  <span>新建文件夹</span>
+                  <span>创建</span>
                 </button>
               </form>
-            </section>
-
-            <section class="file-section" aria-labelledby="file-list-title">
-              <div class="section-heading row-heading">
-                <div>
-                  <h2 id="file-list-title">文件列表</h2>
-                  <p class="muted">当前账号的私有目录。</p>
-                </div>
-                <label class="search-field">
-                  <span class="sr-only">搜索文件</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m21 21-4.35-4.35" />
-                    <circle cx="11" cy="11" r="7" />
-                  </svg>
-                  <input id="file-search" placeholder="搜索当前目录" autocomplete="off" />
-                </label>
-              </div>
+              <label class="search-field file-search-inline">
+                <span class="sr-only">搜索文件</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m21 21-4.35-4.35" />
+                  <circle cx="11" cy="11" r="7" />
+                </svg>
+                <input id="file-search" placeholder="搜索当前目录" autocomplete="off" />
+              </label>
 
               <div class="table-wrap">
                 <table>

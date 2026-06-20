@@ -36,6 +36,7 @@ const elements = {
   userEmptyState: document.querySelector("#user-empty-state"),
   adminBackFolder: document.querySelector("#admin-back-folder"),
   adminRefreshFiles: document.querySelector("#admin-refresh-files"),
+  adminShowFolderForm: document.querySelector("#admin-show-folder-form"),
   adminFolderForm: document.querySelector("#admin-folder-form"),
   adminFolderName: document.querySelector("#admin-folder-name"),
   adminCreateFolderButton: document.querySelector("#admin-create-folder-button"),
@@ -45,6 +46,7 @@ const elements = {
   adminFileEmptyState: document.querySelector("#admin-file-empty-state"),
   refreshFiles: document.querySelector("#refresh-files"),
   backFolder: document.querySelector("#back-folder"),
+  showFolderForm: document.querySelector("#show-folder-form"),
   userLogoutButton: document.querySelector("#user-logout-button"),
   fileInput: document.querySelector("#file-input"),
   folderForm: document.querySelector("#folder-form"),
@@ -66,11 +68,13 @@ elements.adminFilesTab.addEventListener("click", () => showAdminPanel("files"));
 elements.userSearch.addEventListener("input", renderUsers);
 elements.adminBackFolder.addEventListener("click", goBackAdminFolder);
 elements.adminRefreshFiles.addEventListener("click", () => loadAdminDirectory(state.adminCurrentPath));
+elements.adminShowFolderForm.addEventListener("click", () => toggleAdminFolderForm());
 elements.adminFolderForm.addEventListener("submit", handleAdminCreateFolder);
 elements.adminFolderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
 elements.adminFileSearch.addEventListener("input", renderAdminFiles);
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
 elements.backFolder.addEventListener("click", goBackFolder);
+elements.showFolderForm.addEventListener("click", () => toggleFolderForm());
 elements.userLogoutButton.addEventListener("click", logout);
 elements.fileInput.addEventListener("change", handleUpload);
 elements.folderForm.addEventListener("submit", handleCreateFolder);
@@ -209,6 +213,13 @@ function goBackAdminFolder() {
   loadAdminDirectory(parentDirectory(state.adminCurrentPath));
 }
 
+function toggleAdminFolderForm(forceOpen) {
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : elements.adminFolderForm.classList.contains("hidden");
+  elements.adminFolderForm.classList.toggle("hidden", !shouldOpen);
+  elements.adminShowFolderForm.setAttribute("aria-expanded", String(shouldOpen));
+  if (shouldOpen) elements.adminFolderName.focus();
+}
+
 async function handleAdminCreateFolder(event) {
   event.preventDefault();
   const name = elements.adminFolderName.value.trim();
@@ -225,6 +236,7 @@ async function handleAdminCreateFolder(event) {
       body: JSON.stringify({ path: target }),
     });
     elements.adminFolderForm.reset();
+    toggleAdminFolderForm(false);
     await loadAdminDirectory(state.adminCurrentPath);
     showToast("文件夹已创建");
   } catch (error) {
@@ -345,6 +357,13 @@ function goBackFolder() {
   loadDirectory(parentDirectory(state.currentPath));
 }
 
+function toggleFolderForm(forceOpen) {
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : elements.folderForm.classList.contains("hidden");
+  elements.folderForm.classList.toggle("hidden", !shouldOpen);
+  elements.showFolderForm.setAttribute("aria-expanded", String(shouldOpen));
+  if (shouldOpen) elements.folderName.focus();
+}
+
 async function handleUpload() {
   const files = [...elements.fileInput.files];
   elements.fileInput.value = "";
@@ -387,6 +406,7 @@ async function handleCreateFolder(event) {
     });
     if (!response.ok) throw new Error(`创建文件夹失败：${response.status}`);
     elements.folderForm.reset();
+    toggleFolderForm(false);
     await loadDirectory(state.currentPath);
     showToast("文件夹已创建");
   } catch (error) {

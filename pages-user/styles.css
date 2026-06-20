@@ -665,6 +665,34 @@ select:focus {
   gap: 16px;
 }
 
+.file-list-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-list-tools .ghost-button,
+.file-list-tools .upload-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.file-list-tools svg {
+  width: 16px;
+  height: 16px;
+}
+
+.inline-folder-form {
+  margin-bottom: 12px;
+}
+
+.file-search-inline {
+  margin: 0 0 12px;
+}
+
 .search-field {
   position: relative;
   display: block;
@@ -1001,8 +1029,20 @@ tbody tr:last-child td {
     padding: 14px;
   }
 
-  .pathbar,
-  .toolbar {
+  .file-list-heading {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .file-list-heading h2 {
+    margin-bottom: 2px;
+  }
+
+  .file-list-heading .muted {
+    font-size: 12px;
+  }
+
+  .pathbar {
     position: sticky;
     z-index: 8;
     background: rgba(255, 255, 255, 0.96);
@@ -1013,15 +1053,6 @@ tbody tr:last-child td {
     top: 0;
     margin-bottom: 6px;
     padding: 8px;
-  }
-
-  .toolbar {
-    top: 48px;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 10px;
   }
 
   .metric-strip {
@@ -1060,6 +1091,45 @@ tbody tr:last-child td {
   .upload-button {
     min-height: 38px;
     padding: 0 10px;
+  }
+
+  .file-list-tools {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 6px;
+  }
+
+  .file-list-tools .ghost-button,
+  .file-list-tools .upload-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .file-list-tools span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .inline-folder-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-bottom: 10px;
+    gap: 6px;
+  }
+
+  .inline-folder-form input {
+    grid-column: auto;
+    min-height: 36px;
+  }
+
+  .inline-folder-form .primary-button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 
   .admin-form {
