@@ -183,6 +183,7 @@ async function adminDownloadFile(env, url, adminUsername) {
 
   return new Response(file, {
     headers: {
+      "cache-control": "no-store",
       "content-type": node.mime_type || "application/octet-stream",
       "content-length": String(node.size || file.byteLength),
       "content-disposition": `attachment; filename="${contentDispositionFilename(nameFromPath(node.path))}"`,
@@ -273,6 +274,7 @@ function webDavOptions(request) {
   return withCors(new Response(null, {
     status: 204,
     headers: {
+      "cache-control": "no-store",
       allow: "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE",
       dav: "1",
     },
@@ -297,6 +299,7 @@ async function propfind(env, userId, path, depth, origin) {
   return new Response(davMultistatus(nodes, origin), {
     status: 207,
     headers: {
+      "cache-control": "no-store",
       "content-type": "application/xml; charset=utf-8",
       dav: "1",
     },
@@ -311,6 +314,7 @@ async function getFile(env, userId, path, headOnly, origin = "") {
   if (!file) return text("Not Found", 404);
   return new Response(headOnly ? null : file, {
     headers: {
+      "cache-control": "no-store",
       "content-type": node.mime_type || "application/octet-stream",
       "content-length": String(node.size || file.byteLength),
       etag: node.etag || "",
@@ -322,7 +326,7 @@ function redirectToDirectoryPath(path, origin) {
   const href = `${origin}/dav${path === "/" ? "/" : path}`;
   return new Response(null, {
     status: 301,
-    headers: { location: href },
+    headers: { "cache-control": "no-store", location: href },
   });
 }
 
@@ -707,14 +711,14 @@ async function readJson(request) {
 function json(body, status = 200, request) {
   return withCors(new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" },
   }), request);
 }
 
 function text(body, status = 200, headers = {}) {
   return new Response(body, {
     status,
-    headers: { "content-type": "text/plain; charset=utf-8", ...headers },
+    headers: { "cache-control": "no-store", "content-type": "text/plain; charset=utf-8", ...headers },
   });
 }
 

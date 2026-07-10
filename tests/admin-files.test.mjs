@@ -49,6 +49,7 @@ test("admin can download only the admin account's file from KV", async () => {
   }), env);
 
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(response.headers.get("content-type"), "application/json");
   assert.equal(response.headers.get("content-length"), "18");
   assert.equal(response.headers.get("content-disposition"), 'attachment; filename="config_backup.json"');
@@ -412,6 +413,7 @@ test("WebDAV OPTIONS advertises DAV support for clients", async () => {
   }), env);
 
   assert.equal(response.status, 204);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(response.headers.get("dav"), "1");
   assert.match(response.headers.get("allow") || "", /PROPFIND/);
 });
@@ -438,6 +440,7 @@ test("WebDAV GET on a directory redirects clients to the canonical slash path", 
   }), env);
 
   assert.equal(response.status, 301);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(response.headers.get("location"), "https://example.test/dav/");
 });
 
@@ -451,6 +454,7 @@ test("static assets include browser security headers", async () => {
   const response = await worker.fetch(new Request("https://example.test/"), env);
 
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), null);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
