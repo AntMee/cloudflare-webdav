@@ -374,6 +374,18 @@ select:focus {
   background: #a91f1f;
 }
 
+.danger-button.compact {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.danger-button:disabled {
+  background: #e6a6a6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .ghost-button:disabled {
   background: #f8fafc;
   color: #9aa8bb;
@@ -707,6 +719,54 @@ select:focus {
   margin: 0 0 12px;
 }
 
+.bulk-bar,
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px 10px;
+}
+
+.pagination-bar {
+  margin: 12px 0 0;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.select-all-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.select-all-control input,
+.row-checkbox {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+
+.selection-count {
+  margin-right: auto;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .search-field {
   position: relative;
   display: block;
@@ -735,7 +795,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 760px;
+  min-width: 820px;
   border-collapse: collapse;
   background: #ffffff;
 }
@@ -838,6 +898,12 @@ tbody tr:last-child td {
 
 .action-col {
   width: 230px;
+}
+
+.select-col,
+.select-cell {
+  width: 54px;
+  text-align: center;
 }
 
 .row-actions {
@@ -1241,7 +1307,7 @@ tbody tr:last-child td {
   }
 
   table {
-    min-width: 720px;
+    min-width: 820px;
   }
 
   .file-name {
@@ -1252,6 +1318,22 @@ tbody tr:last-child td {
     right: 12px;
     bottom: 12px;
     max-width: calc(100% - 24px);
+  }
+
+  .bulk-bar,
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .selection-count {
+    margin-right: 0;
+  }
+
+  .bulk-bar .danger-button,
+  .pagination-actions,
+  .pagination-actions .ghost-button {
+    width: 100%;
   }
 
   .confirm-overlay {

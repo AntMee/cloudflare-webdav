@@ -9,7 +9,13 @@ const state = {
   files: [],
   adminFiles: [],
   users: [],
+  selectedFiles: new Set(),
+  selectedAdminFiles: new Set(),
+  filePage: 1,
+  adminFilePage: 1,
 };
+
+const PAGE_SIZE = 20;
 
 const elements = {
   loginView: document.querySelector("#login-view"),
@@ -42,6 +48,14 @@ const elements = {
   adminCreateFolderButton: document.querySelector("#admin-create-folder-button"),
   adminFileBreadcrumbs: document.querySelector("#admin-file-breadcrumbs"),
   adminFileSearch: document.querySelector("#admin-file-search"),
+  adminBulkBar: document.querySelector("#admin-bulk-bar"),
+  adminSelectedCount: document.querySelector("#admin-selected-count"),
+  adminSelectAll: document.querySelector("#admin-select-all"),
+  adminBulkDelete: document.querySelector("#admin-bulk-delete"),
+  adminPagination: document.querySelector("#admin-pagination"),
+  adminPageSummary: document.querySelector("#admin-page-summary"),
+  adminPrevPage: document.querySelector("#admin-prev-page"),
+  adminNextPage: document.querySelector("#admin-next-page"),
   adminFileList: document.querySelector("#admin-file-list"),
   adminFileEmptyState: document.querySelector("#admin-file-empty-state"),
   refreshFiles: document.querySelector("#refresh-files"),
@@ -53,6 +67,14 @@ const elements = {
   folderName: document.querySelector("#folder-name"),
   createFolderButton: document.querySelector("#create-folder-button"),
   fileSearch: document.querySelector("#file-search"),
+  bulkBar: document.querySelector("#bulk-bar"),
+  selectedCount: document.querySelector("#selected-count"),
+  selectAll: document.querySelector("#select-all"),
+  bulkDelete: document.querySelector("#bulk-delete"),
+  pagination: document.querySelector("#pagination"),
+  pageSummary: document.querySelector("#page-summary"),
+  prevPage: document.querySelector("#prev-page"),
+  nextPage: document.querySelector("#next-page"),
   fileList: document.querySelector("#file-list"),
   emptyState: document.querySelector("#empty-state"),
   breadcrumbs: document.querySelector("#breadcrumbs"),
@@ -76,7 +98,14 @@ elements.adminRefreshFiles.addEventListener("click", () => loadAdminDirectory(st
 elements.adminShowFolderForm.addEventListener("click", () => toggleAdminFolderForm());
 elements.adminFolderForm.addEventListener("submit", handleAdminCreateFolder);
 elements.adminFolderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
-elements.adminFileSearch.addEventListener("input", renderAdminFiles);
+elements.adminFileSearch.addEventListener("input", () => {
+  state.adminFilePage = 1;
+  renderAdminFiles();
+});
+elements.adminSelectAll.addEventListener("change", toggleAdminSelectAll);
+elements.adminBulkDelete.addEventListener("click", handleAdminBulkDelete);
+elements.adminPrevPage.addEventListener("click", () => changeAdminFilePage(-1));
+elements.adminNextPage.addEventListener("click", () => changeAdminFilePage(1));
 elements.refreshFiles.addEventListener("click", () => loadDirectory(state.currentPath));
 elements.backFolder.addEventListener("click", goBackFolder);
 elements.showFolderForm.addEventListener("click", () => toggleFolderForm());
@@ -84,7 +113,14 @@ elements.userLogoutButton.addEventListener("click", logout);
 elements.fileInput.addEventListener("change", handleUpload);
 elements.folderForm.addEventListener("submit", handleCreateFolder);
 elements.folderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
-elements.fileSearch.addEventListener("input", renderFiles);
+elements.fileSearch.addEventListener("input", () => {
+  state.filePage = 1;
+  renderFiles();
+});
+elements.selectAll.addEventListener("change", toggleSelectAll);
+elements.bulkDelete.addEventListener("click", handleBulkDelete);
+elements.prevPage.addEventListener("click", () => changeFilePage(-1));
+elements.nextPage.addEventListener("click", () => changeFilePage(1));
 elements.confirmCancel.addEventListener("click", () => closeConfirmDialog(false));
 elements.confirmOk.addEventListener("click", () => closeConfirmDialog(true));
 elements.confirmOverlay.addEventListener("click", (event) => {
@@ -209,6 +245,8 @@ async function handleCreateUser(event) {
 
 async function loadAdminDirectory(path) {
   state.adminCurrentPath = ensureDirectory(path);
+  state.selectedAdminFiles.clear();
+  state.adminFilePage = 1;
   try {
     const query = new URLSearchParams({
       path: state.adminCurrentPath,
@@ -357,6 +395,8 @@ async function refreshAdminView() {
 
 async function loadDirectory(path) {
   state.currentPath = ensureDirectory(path);
+  state.selectedFiles.clear();
+  state.filePage = 1;
 
   try {
     state.files = await propfind(state.currentPath, 1);
@@ -399,7 +439,7 @@ async function handleUpload() {
       if (!response.ok) throw new Error(`上传失败：${file.name}`);
     }
     await loadDirectory(state.currentPath);
-    showToast(`已上传 ${files.length} 个文件`);
+    showToast(`Uploaded ${files.length} files`);
   } catch (error) {
     showToast(error.message, true);
   }
@@ -509,6 +549,55 @@ async function adminDeleteEntry(file) {
   }
 }
 
+async function handleBulkDelete() {
+  const files = state.files.filter((file) => state.selectedFiles.has(file.path));
+  if (files.length === 0) return;
+  if (!(await confirmBulkDelete(files))) return;
+
+  elements.bulkDelete.disabled = true;
+  try {
+    for (const file of files) {
+      const response = await fetch(davUrl(file.path), {
+        method: "DELETE",
+        headers: { authorization: state.userAuth, "x-webdav-web": "1" },
+      });
+      if (!response.ok) throw new Error(`删除失败：${file.name}`);
+    }
+    state.selectedFiles.clear();
+    await loadDirectory(state.currentPath);
+    showToast(`Deleted ${files.length} items`);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    elements.bulkDelete.disabled = false;
+  }
+}
+
+async function handleAdminBulkDelete() {
+  const files = state.adminFiles.filter((file) => state.selectedAdminFiles.has(file.path));
+  if (files.length === 0) return;
+  if (!(await confirmBulkDelete(files))) return;
+
+  elements.adminBulkDelete.disabled = true;
+  try {
+    for (const file of files) {
+      const query = new URLSearchParams({ path: file.path });
+      const response = await fetch(`/api/admin/files?${query.toString()}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${state.adminToken}` },
+      });
+      if (!response.ok) throw new Error(`Delete failed: ${file.name}`);
+    }
+    state.selectedAdminFiles.clear();
+    await loadAdminDirectory(state.adminCurrentPath);
+    showToast(`Deleted ${files.length} items`);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    elements.adminBulkDelete.disabled = false;
+  }
+}
+
 async function propfind(path, depth) {
   const response = await fetch(davUrl(path), {
     method: "PROPFIND",
@@ -559,9 +648,21 @@ function renderFiles() {
   const query = elements.fileSearch.value.trim().toLowerCase();
   const filtered = state.files.filter((file) => file.name.toLowerCase().includes(query));
   filtered.sort(sortFiles);
+  syncSelection(state.selectedFiles, filtered);
+  const page = pageItems(filtered, state.filePage);
+  state.filePage = page.page;
 
-  elements.fileList.innerHTML = filtered.map(fileRow).join("");
+  elements.fileList.innerHTML = page.items.map(fileRow).join("");
   elements.emptyState.classList.toggle("hidden", filtered.length > 0);
+  updateBulkControls({ filtered, pageItems: page.items });
+  updatePagination({
+    total: filtered.length,
+    page: page.page,
+    totalPages: page.totalPages,
+    summaryElement: elements.pageSummary,
+    prevButton: elements.prevPage,
+    nextButton: elements.nextPage,
+  });
   updateFileStats();
 
   elements.fileList.querySelectorAll("[data-open]").forEach((button) => {
@@ -586,6 +687,13 @@ function renderFiles() {
       if (file) deleteEntry(file);
     });
   });
+
+  elements.fileList.querySelectorAll("[data-select]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      setSelection(state.selectedFiles, checkbox.dataset.select, checkbox.checked);
+      updateBulkControls({ filtered, pageItems: page.items });
+    });
+  });
 }
 
 function renderAdminFiles() {
@@ -593,11 +701,23 @@ function renderAdminFiles() {
   const query = elements.adminFileSearch.value.trim().toLowerCase();
   const filtered = state.adminFiles.filter((file) => file.name.toLowerCase().includes(query));
   filtered.sort(sortFiles);
+  syncSelection(state.selectedAdminFiles, filtered);
+  const page = pageItems(filtered, state.adminFilePage);
+  state.adminFilePage = page.page;
 
-  elements.adminFileList.innerHTML = filtered.map((file) => fileRow(file, { admin: true })).join("");
+  elements.adminFileList.innerHTML = page.items.map((file) => fileRow(file, { admin: true })).join("");
   const isEmpty = filtered.length === 0;
   elements.adminFileEmptyState.classList.toggle("hidden", !isEmpty);
-  elements.adminFileEmptyState.querySelector("p").textContent = "当前目录为空";
+  elements.adminFileEmptyState.querySelector("p").textContent = "Empty directory";
+  updateAdminBulkControls({ filtered, pageItems: page.items });
+  updatePagination({
+    total: filtered.length,
+    page: page.page,
+    totalPages: page.totalPages,
+    summaryElement: elements.adminPageSummary,
+    prevButton: elements.adminPrevPage,
+    nextButton: elements.adminNextPage,
+  });
   updateAdminFileStats();
 
   elements.adminFileList.querySelectorAll("[data-admin-open]").forEach((button) => {
@@ -622,6 +742,13 @@ function renderAdminFiles() {
       if (file) adminDeleteEntry(file);
     });
   });
+
+  elements.adminFileList.querySelectorAll("[data-admin-select]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      setSelection(state.selectedAdminFiles, checkbox.dataset.adminSelect, checkbox.checked);
+      updateAdminBulkControls({ filtered, pageItems: page.items });
+    });
+  });
 }
 
 function fileRow(file, options = {}) {
@@ -629,8 +756,15 @@ function fileRow(file, options = {}) {
   const openAttr = options.admin ? "data-admin-open" : "data-open";
   const downloadAttr = options.admin ? "data-admin-download" : "data-download";
   const deleteAttr = options.admin ? "data-admin-delete" : "data-delete";
+  const selectAttr = options.admin ? "data-admin-select" : "data-select";
+  const selected = options.admin ? state.selectedAdminFiles.has(file.path) : state.selectedFiles.has(file.path);
+  const checkedAttr = selected ? " checked" : "";
+  const downloadButton = isDirectory ? "" : `<button class="table-action" type="button" ${downloadAttr}="${escapeHtml(file.path)}">Download</button>`;
   return `
     <tr>
+      <td class="select-cell">
+        <input class="row-checkbox" type="checkbox" ${selectAttr}="${escapeHtml(file.path)}"${checkedAttr} aria-label="Select ${escapeHtml(file.name)}" />
+      </td>
       <td>
         <button class="file-name" type="button" ${openAttr}="${escapeHtml(file.path)}">
           <span class="file-icon ${isDirectory ? "folder" : ""}">
@@ -639,17 +773,112 @@ function fileRow(file, options = {}) {
           <span>${escapeHtml(file.name)}</span>
         </button>
       </td>
-      <td><span class="badge">${isDirectory ? "文件夹" : "文件"}</span></td>
+      <td><span class="badge">${isDirectory ? "Folder" : "File"}</span></td>
       <td>${isDirectory ? "-" : formatBytes(file.size)}</td>
       <td>${escapeHtml(formatDate(file.modified))}</td>
       <td>
         <div class="row-actions">
-          ${isDirectory ? "" : `<button class="table-action" type="button" ${downloadAttr}="${escapeHtml(file.path)}">下载</button>`}
-          <button class="table-action danger" type="button" ${deleteAttr}="${escapeHtml(file.path)}">删除</button>
+          ${downloadButton}
+          <button class="table-action danger" type="button" ${deleteAttr}="${escapeHtml(file.path)}">Delete</button>
         </div>
       </td>
     </tr>
   `;
+}
+
+function pageItems(items, requestedPage) {
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const page = Math.min(Math.max(Number(requestedPage) || 1, 1), totalPages);
+  const start = (page - 1) * PAGE_SIZE;
+  return { items: items.slice(start, start + PAGE_SIZE), page, totalPages };
+}
+
+function updatePagination({ total, page, totalPages, summaryElement, prevButton, nextButton }) {
+  const start = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, total);
+  summaryElement.textContent = total > PAGE_SIZE ? `${start}-${end} / ${total}` : `Total ${total}`;
+  prevButton.disabled = page <= 1;
+  nextButton.disabled = page >= totalPages;
+}
+
+function changeFilePage(delta) {
+  state.filePage += delta;
+  renderFiles();
+}
+
+function changeAdminFilePage(delta) {
+  state.adminFilePage += delta;
+  renderAdminFiles();
+}
+
+function syncSelection(selection, files) {
+  const paths = new Set(files.map((file) => file.path));
+  for (const path of [...selection]) {
+    if (!paths.has(path)) selection.delete(path);
+  }
+}
+
+function setSelection(selection, path, selected) {
+  if (!path) return;
+  if (selected) selection.add(path);
+  else selection.delete(path);
+}
+
+function toggleSelectAll() {
+  const pageFiles = currentPageFiles(state.files, elements.fileSearch.value, state.filePage);
+  toggleSelectionForPage(state.selectedFiles, pageFiles, elements.selectAll.checked);
+  renderFiles();
+}
+
+function toggleAdminSelectAll() {
+  const pageFiles = currentPageFiles(state.adminFiles, elements.adminFileSearch.value, state.adminFilePage);
+  toggleSelectionForPage(state.selectedAdminFiles, pageFiles, elements.adminSelectAll.checked);
+  renderAdminFiles();
+}
+
+function currentPageFiles(files, queryValue, pageValue) {
+  const query = queryValue.trim().toLowerCase();
+  const filtered = files.filter((file) => file.name.toLowerCase().includes(query));
+  filtered.sort(sortFiles);
+  return pageItems(filtered, pageValue).items;
+}
+
+function toggleSelectionForPage(selection, files, selected) {
+  files.forEach((file) => setSelection(selection, file.path, selected));
+}
+
+function updateBulkControls({ filtered, pageItems }) {
+  updateSelectionControls({
+    selection: state.selectedFiles,
+    filtered,
+    pageItems,
+    selectAll: elements.selectAll,
+    bulkBar: elements.bulkBar,
+    selectedCount: elements.selectedCount,
+    bulkDelete: elements.bulkDelete,
+  });
+}
+
+function updateAdminBulkControls({ filtered, pageItems }) {
+  updateSelectionControls({
+    selection: state.selectedAdminFiles,
+    filtered,
+    pageItems,
+    selectAll: elements.adminSelectAll,
+    bulkBar: elements.adminBulkBar,
+    selectedCount: elements.adminSelectedCount,
+    bulkDelete: elements.adminBulkDelete,
+  });
+}
+
+function updateSelectionControls({ selection, filtered, pageItems, selectAll, bulkBar, selectedCount, bulkDelete }) {
+  const selectedOnPage = pageItems.filter((file) => selection.has(file.path)).length;
+  selectAll.checked = pageItems.length > 0 && selectedOnPage === pageItems.length;
+  selectAll.indeterminate = selectedOnPage > 0 && selectedOnPage < pageItems.length;
+  selectAll.disabled = pageItems.length === 0;
+  bulkBar.classList.toggle("hidden", filtered.length === 0);
+  selectedCount.textContent = `Selected ${selection.size}`;
+  bulkDelete.disabled = selection.size === 0;
 }
 
 function renderBreadcrumbs() {
@@ -838,6 +1067,13 @@ function confirmDelete(file) {
   return showConfirmDialog({
     message: `确定删除这个${typeName}？删除后无法恢复。`,
     target: file.name,
+  });
+}
+
+function confirmBulkDelete(files) {
+  return showConfirmDialog({
+    message: `Delete ${files.length} selected items? This cannot be undone.`,
+    target: files.map((file) => file.name).slice(0, 3).join(", ") + (files.length > 3 ? " ..." : ""),
   });
 }
 

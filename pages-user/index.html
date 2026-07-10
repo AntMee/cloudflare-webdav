@@ -277,11 +277,20 @@
                   </svg>
                   <input id="admin-file-search" placeholder="搜索当前目录" autocomplete="off" />
                 </label>
+                <div class="bulk-bar hidden" id="admin-bulk-bar">
+                  <label class="select-all-control">
+                    <input id="admin-select-all" type="checkbox" />
+                    <span>选择本页</span>
+                  </label>
+                  <span class="selection-count" id="admin-selected-count">已选 0 项</span>
+                  <button class="danger-button compact" id="admin-bulk-delete" type="button" disabled>批量删除</button>
+                </div>
 
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
+                        <th class="select-col">选择</th>
                         <th>名称</th>
                         <th>类型</th>
                         <th>大小</th>
@@ -296,6 +305,13 @@
                       <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4.2l2 2H18a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 18 19H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
                     </svg>
                     <p>当前目录为空</p>
+                  </div>
+                </div>
+                <div class="pagination-bar" id="admin-pagination">
+                  <span id="admin-page-summary">共 0 项</span>
+                  <div class="pagination-actions">
+                    <button class="ghost-button" id="admin-prev-page" type="button" disabled>上一页</button>
+                    <button class="ghost-button" id="admin-next-page" type="button" disabled>下一页</button>
                   </div>
                 </div>
               </section>
@@ -404,11 +420,20 @@
                 </svg>
                 <input id="file-search" placeholder="搜索当前目录" autocomplete="off" />
               </label>
+              <div class="bulk-bar hidden" id="bulk-bar">
+                <label class="select-all-control">
+                  <input id="select-all" type="checkbox" />
+                  <span>选择本页</span>
+                </label>
+                <span class="selection-count" id="selected-count">已选 0 项</span>
+                <button class="danger-button compact" id="bulk-delete" type="button" disabled>批量删除</button>
+              </div>
 
               <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
+                      <th class="select-col">选择</th>
                       <th>名称</th>
                       <th>类型</th>
                       <th>大小</th>
@@ -423,6 +448,13 @@
                     <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4.2l2 2H18a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 18 19H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
                   </svg>
                   <p>当前目录为空</p>
+                </div>
+              </div>
+              <div class="pagination-bar" id="pagination">
+                <span id="page-summary">共 0 项</span>
+                <div class="pagination-actions">
+                  <button class="ghost-button" id="prev-page" type="button" disabled>上一页</button>
+                  <button class="ghost-button" id="next-page" type="button" disabled>下一页</button>
                 </div>
               </div>
             </section>
