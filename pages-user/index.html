@@ -97,6 +97,7 @@
               <span>刷新</span>
             </button>
             <button class="ghost-button" id="admin-logout-button" type="button">退出</button>
+            <button class="ghost-button language-toggle" id="admin-language-toggle" type="button">EN</button>
           </div>
         </header>
 
@@ -280,17 +281,17 @@
                 <div class="bulk-bar hidden" id="admin-bulk-bar">
                   <label class="select-all-control">
                     <input id="admin-select-all" type="checkbox" />
-                    <span>选择本页</span>
+                    <span data-i18n="selectPage">选择本页</span>
                   </label>
                   <span class="selection-count" id="admin-selected-count">已选 0 项</span>
-                  <button class="danger-button compact" id="admin-bulk-delete" type="button" disabled>批量删除</button>
+                  <button class="danger-button compact" id="admin-bulk-delete" type="button" disabled data-i18n="bulkDelete">批量删除</button>
                 </div>
 
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th class="select-col">选择</th>
+                        <th class="select-col" data-i18n="selectColumn">选择</th>
                         <th>名称</th>
                         <th>类型</th>
                         <th>大小</th>
@@ -309,9 +310,17 @@
                 </div>
                 <div class="pagination-bar" id="admin-pagination">
                   <span id="admin-page-summary">共 0 项</span>
+                  <label class="page-size-control">
+                    <span data-i18n="pageSize">每页</span>
+                    <select id="admin-page-size">
+                      <option value="10">10 条/页</option>
+                      <option value="20" selected>20 条/页</option>
+                      <option value="50">50 条/页</option>
+                    </select>
+                  </label>
                   <div class="pagination-actions">
-                    <button class="ghost-button" id="admin-prev-page" type="button" disabled>上一页</button>
-                    <button class="ghost-button" id="admin-next-page" type="button" disabled>下一页</button>
+                    <button class="ghost-button" id="admin-prev-page" type="button" disabled data-i18n="prevPage">上一页</button>
+                    <button class="ghost-button" id="admin-next-page" type="button" disabled data-i18n="nextPage">下一页</button>
                   </div>
                 </div>
               </section>
@@ -346,6 +355,7 @@
               <span>刷新</span>
             </button>
             <button class="ghost-button" id="user-logout-button" type="button">退出</button>
+            <button class="ghost-button language-toggle" id="language-toggle" type="button">EN</button>
           </div>
         </header>
 
@@ -423,17 +433,17 @@
               <div class="bulk-bar hidden" id="bulk-bar">
                 <label class="select-all-control">
                   <input id="select-all" type="checkbox" />
-                  <span>选择本页</span>
+                  <span data-i18n="selectPage">选择本页</span>
                 </label>
                 <span class="selection-count" id="selected-count">已选 0 项</span>
-                <button class="danger-button compact" id="bulk-delete" type="button" disabled>批量删除</button>
+                <button class="danger-button compact" id="bulk-delete" type="button" disabled data-i18n="bulkDelete">批量删除</button>
               </div>
 
               <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
-                      <th class="select-col">选择</th>
+                      <th class="select-col" data-i18n="selectColumn">选择</th>
                       <th>名称</th>
                       <th>类型</th>
                       <th>大小</th>
@@ -452,9 +462,17 @@
               </div>
               <div class="pagination-bar" id="pagination">
                 <span id="page-summary">共 0 项</span>
+                <label class="page-size-control">
+                  <span data-i18n="pageSize">每页</span>
+                  <select id="page-size">
+                    <option value="10">10 条/页</option>
+                    <option value="20" selected>20 条/页</option>
+                    <option value="50">50 条/页</option>
+                  </select>
+                </label>
                 <div class="pagination-actions">
-                  <button class="ghost-button" id="prev-page" type="button" disabled>上一页</button>
-                  <button class="ghost-button" id="next-page" type="button" disabled>下一页</button>
+                  <button class="ghost-button" id="prev-page" type="button" disabled data-i18n="prevPage">上一页</button>
+                  <button class="ghost-button" id="next-page" type="button" disabled data-i18n="nextPage">下一页</button>
                 </div>
               </div>
             </section>
