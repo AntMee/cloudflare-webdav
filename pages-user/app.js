@@ -57,6 +57,11 @@ const elements = {
   emptyState: document.querySelector("#empty-state"),
   breadcrumbs: document.querySelector("#breadcrumbs"),
   toast: document.querySelector("#toast"),
+  confirmOverlay: document.querySelector("#confirm-overlay"),
+  confirmMessage: document.querySelector("#confirm-message"),
+  confirmTarget: document.querySelector("#confirm-target"),
+  confirmOk: document.querySelector("#confirm-ok"),
+  confirmCancel: document.querySelector("#confirm-cancel"),
 };
 
 elements.loginForm.addEventListener("submit", handleLogin);
@@ -80,6 +85,16 @@ elements.fileInput.addEventListener("change", handleUpload);
 elements.folderForm.addEventListener("submit", handleCreateFolder);
 elements.folderName.addEventListener("invalid", () => showToast("请输入文件夹名称", true));
 elements.fileSearch.addEventListener("input", renderFiles);
+elements.confirmCancel.addEventListener("click", () => closeConfirmDialog(false));
+elements.confirmOk.addEventListener("click", () => closeConfirmDialog(true));
+elements.confirmOverlay.addEventListener("click", (event) => {
+  if (event.target === elements.confirmOverlay) closeConfirmDialog(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.confirmOverlay.classList.contains("hidden")) {
+    closeConfirmDialog(false);
+  }
+});
 
 if (state.adminToken) {
   showAdminView();
@@ -437,7 +452,7 @@ async function downloadFile(file) {
 }
 
 async function deleteEntry(file) {
-  if (!window.confirm(`确定删除 ${file.name}？`)) return;
+  if (!(await confirmDelete(file))) return;
 
   try {
     const response = await fetch(davUrl(file.path), {
@@ -476,7 +491,7 @@ async function adminDownloadFile(file) {
 }
 
 async function adminDeleteEntry(file) {
-  if (!window.confirm(`确定删除 ${file.name}？`)) return;
+  if (!(await confirmDelete(file))) return;
 
   try {
     const query = new URLSearchParams({
@@ -816,6 +831,33 @@ function showToast(message, isError = false) {
   showToast.timer = window.setTimeout(() => {
     elements.toast.classList.add("hidden");
   }, 4200);
+}
+
+function confirmDelete(file) {
+  const typeName = file.type === "directory" ? "文件夹" : "文件";
+  return showConfirmDialog({
+    message: `确定删除这个${typeName}？删除后无法恢复。`,
+    target: file.name,
+  });
+}
+
+function showConfirmDialog({ message, target }) {
+  if (showConfirmDialog.resolve) closeConfirmDialog(false);
+  elements.confirmMessage.textContent = message;
+  elements.confirmTarget.textContent = target || "";
+  elements.confirmOverlay.classList.remove("hidden");
+  elements.confirmOk.focus();
+  return new Promise((resolve) => {
+    showConfirmDialog.resolve = resolve;
+  });
+}
+
+function closeConfirmDialog(result) {
+  if (elements.confirmOverlay.classList.contains("hidden")) return;
+  elements.confirmOverlay.classList.add("hidden");
+  const resolve = showConfirmDialog.resolve;
+  showConfirmDialog.resolve = null;
+  if (resolve) resolve(result);
 }
 
 function safeJson(text) {

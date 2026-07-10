@@ -432,6 +432,26 @@
     </main>
 
     <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+    <div class="confirm-overlay hidden" id="confirm-overlay" role="presentation">
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+        <div class="confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+            <path d="M10.3 4.3 2.7 17.5A2 2 0 0 0 4.4 20h15.2a2 2 0 0 0 1.7-2.5L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+          </svg>
+        </div>
+        <div class="confirm-content">
+          <h2 id="confirm-title">确认删除</h2>
+          <p id="confirm-message">删除后无法恢复。</p>
+          <p class="confirm-target" id="confirm-target"></p>
+        </div>
+        <div class="confirm-actions">
+          <button class="ghost-button" id="confirm-cancel" type="button">取消</button>
+          <button class="danger-button" id="confirm-ok" type="button">删除</button>
+        </div>
+      </section>
+    </div>
     <script src="./app.js" defer></script>
   </body>
 </html>

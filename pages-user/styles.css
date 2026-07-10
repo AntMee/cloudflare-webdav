@@ -291,6 +291,7 @@ select:focus {
 
 .primary-button,
 .ghost-button,
+.danger-button,
 .preview-button,
 .table-action,
 .upload-button {
@@ -330,6 +331,7 @@ select:focus {
 
 .primary-button:active,
 .ghost-button:active,
+.danger-button:active,
 .table-action:active,
 .upload-button:active {
   transform: translateY(1px);
@@ -358,6 +360,18 @@ select:focus {
 .upload-button:hover {
   background: var(--surface-soft);
   border-color: #b7c4d4;
+}
+
+.danger-button {
+  min-height: 38px;
+  border-color: #efc5c5;
+  background: var(--danger);
+  color: #ffffff;
+  padding: 0 14px;
+}
+
+.danger-button:hover {
+  background: #a91f1f;
 }
 
 .ghost-button:disabled {
@@ -876,6 +890,70 @@ tbody tr:last-child td {
   color: #991b1b;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.32);
+  padding: 20px;
+}
+
+.confirm-dialog {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  width: min(430px, 100%);
+  border: 1px solid rgba(216, 224, 234, 0.95);
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #f0c7c7;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.confirm-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.confirm-content h2 {
+  margin-bottom: 6px;
+  font-size: 18px;
+}
+
+.confirm-content p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.confirm-target {
+  margin-top: 8px !important;
+  overflow-wrap: anywhere;
+  color: var(--text) !important;
+  font-weight: 800;
+}
+
+.confirm-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     width: min(100% - 24px, 760px);
@@ -1174,5 +1252,27 @@ tbody tr:last-child td {
     right: 12px;
     bottom: 12px;
     max-width: calc(100% - 24px);
+  }
+
+  .confirm-overlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .confirm-dialog {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .confirm-actions .ghost-button,
+  .confirm-actions .danger-button {
+    width: 100%;
+    min-height: 38px;
   }
 }
