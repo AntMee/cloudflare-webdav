@@ -35,6 +35,9 @@ export default {
 
       return withCors(text("Not Found", 404), request);
     } catch (error) {
+      if (isMissingD1MigrationError(error)) {
+        return json({ error: "D1 migrations have not run. Apply the database migrations before using Cloudflare WebDAV." }, 503, request);
+      }
       console.error(error);
       return json({ error: "Internal Error" }, 500, request);
     }
@@ -93,6 +96,10 @@ async function handleAdmin(request, env, url) {
 
   if (request.method === "POST" && path === "/files/folders") {
     return adminCreateFolder(request, env, admin.username);
+  }
+
+  if (request.method === "PATCH" && path === "/files/move") {
+    return adminMoveEntry(request, env, admin.username);
   }
 
   if (request.method === "POST" && path === "/users") {
@@ -227,6 +234,18 @@ async function adminCreateFolder(request, env, adminUsername) {
   }, 201, request);
 }
 
+async function adminMoveEntry(request, env, adminUsername) {
+  const body = await readJson(request);
+  const source = normalizeAdminFilePath(body.source || "/");
+  const destination = normalizeAdminFilePath(body.destination || "/");
+  if (!source.ok) return json({ error: source.message }, source.status, request);
+  if (!destination.ok) return json({ error: destination.message }, destination.status, request);
+  const user = await ensureAdminFileUser(env.DB, adminUsername);
+  const result = await moveEntryPath(env, user.id, source.path, destination.path);
+  if (!result.ok) return json({ error: result.message }, result.status, request);
+  return json({ ok: true, path: destination.path }, 200, request);
+}
+
 async function handleWebDav(request, env, url) {
   if (request.method === "OPTIONS") {
     return webDavOptions(request);
@@ -266,6 +285,9 @@ async function handleWebDav(request, env, url) {
   if (request.method === "DELETE") {
     return deleteEntry(env, user.id, path.path);
   }
+  if (request.method === "MOVE") {
+    return moveEntry(request, env, user.id, path.path, url);
+  }
 
   return text("Not Implemented", 501);
 }
@@ -275,7 +297,7 @@ function webDavOptions(request) {
     status: 204,
     headers: {
       "cache-control": "no-store",
-      allow: "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE",
+      allow: "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE, MOVE",
       dav: "1",
     },
   }), request);
@@ -383,6 +405,54 @@ async function makeCollection(env, userId, path) {
   if (await getNode(env.DB, userId, dir)) return text("Method Not Allowed", 405);
   await createDirectory(env.DB, userId, dir);
   return text("Created", 201);
+}
+
+async function moveEntry(request, env, userId, sourcePath, url) {
+  const destination = destinationPath(request.headers.get("destination"), url);
+  if (!destination.ok) return text(destination.message, destination.status);
+  const result = await moveEntryPath(env, userId, sourcePath, destination.path);
+  if (!result.ok) return text(result.message, result.status);
+  return new Response(null, { status: 201, headers: { "cache-control": "no-store" } });
+}
+
+async function moveEntryPath(env, userId, sourcePath, targetPath) {
+  if (sourcePath === "/") return { ok: false, status: 405, message: "Method Not Allowed" };
+  if (targetPath === "/" || targetPath === sourcePath) return { ok: false, status: 400, message: "Invalid destination" };
+
+  const node = await getNode(env.DB, userId, sourcePath);
+  if (!node) return { ok: false, status: 404, message: "Not Found" };
+  if (node.kind === "directory" && !targetPath.endsWith("/")) return { ok: false, status: 400, message: "Invalid destination" };
+  if (node.kind === "file" && targetPath.endsWith("/")) return { ok: false, status: 400, message: "Invalid destination" };
+  if (node.kind === "directory" && targetPath.startsWith(sourcePath)) return { ok: false, status: 409, message: "Invalid destination" };
+  if (await getNode(env.DB, userId, targetPath)) return { ok: false, status: 412, message: "Destination exists" };
+
+  const parent = await getNode(env.DB, userId, parentPath(targetPath));
+  if (!parent || parent.kind !== "directory") return { ok: false, status: 409, message: "Conflict" };
+
+  const entries = [node];
+  if (node.kind === "directory") {
+    const result = await env.DB.prepare("SELECT * FROM nodes WHERE owner_user_id = ? AND path != ?")
+      .bind(userId, sourcePath)
+      .all();
+    entries.push(...result.results.filter((item) => isDescendant(sourcePath, item.path)));
+  }
+
+  const now = new Date().toISOString();
+  for (const entry of entries.sort((left, right) => left.path.length - right.path.length)) {
+    const nextPath = entry.path === sourcePath ? targetPath : `${targetPath}${entry.path.slice(sourcePath.length)}`;
+    let nextKey = entry.kv_key;
+    if (entry.kind === "file" && entry.kv_key) {
+      nextKey = `users/${userId}${nextPath}`;
+      const value = await env.KV.get(entry.kv_key, "arrayBuffer");
+      if (value) await env.KV.put(nextKey, value);
+      await env.KV.delete(entry.kv_key);
+    }
+    await env.DB.prepare("UPDATE nodes SET path = ?, kv_key = ?, updated_at = ? WHERE owner_user_id = ? AND path = ?")
+      .bind(nextPath, nextKey, now, userId, entry.path)
+      .run();
+  }
+
+  return { ok: true };
 }
 
 async function deleteEntry(env, userId, path) {
@@ -624,6 +694,20 @@ function normalizePathValue(decoded) {
   return { ok: true, path: trailing ? `${normalized}/` : normalized };
 }
 
+function destinationPath(value, currentUrl) {
+  if (!value) return { ok: false, status: 400, message: "Missing destination" };
+  let destination;
+  try {
+    destination = new URL(value, currentUrl.origin);
+  } catch {
+    return { ok: false, status: 400, message: "Invalid destination" };
+  }
+  if (destination.origin !== currentUrl.origin || !destination.pathname.startsWith("/dav")) {
+    return { ok: false, status: 400, message: "Invalid destination" };
+  }
+  return normalizeDavPath(destination.pathname);
+}
+
 function parentPath(path) {
   if (path === "/") return "/";
   const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
@@ -698,6 +782,15 @@ function unauthorized(request) {
   return text("Unauthorized", 401, { "www-authenticate": 'Basic realm="Cloudflare WebDAV"' });
 }
 
+function isMissingD1MigrationError(error) {
+  let current = error;
+  while (current) {
+    if (/no such table/i.test(String(current.message || current))) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 async function readJson(request) {
   const contentLength = Number(request.headers.get("content-length") || "0");
   if (contentLength > 65536) throw new Error("JSON request body is too large");
@@ -752,8 +845,8 @@ function corsHeaders(request) {
   const allowOrigin = origin || requestOrigin;
   return {
     "access-control-allow-origin": allowOrigin,
-    "access-control-allow-methods": "GET, HEAD, POST, PATCH, PUT, DELETE, MKCOL, PROPFIND, OPTIONS",
-    "access-control-allow-headers": "authorization, content-type, depth, x-webdav-web",
+    "access-control-allow-methods": "GET, HEAD, POST, PATCH, PUT, DELETE, MKCOL, PROPFIND, MOVE, OPTIONS",
+    "access-control-allow-headers": "authorization, content-type, depth, destination, x-webdav-web",
     "access-control-expose-headers": "etag, dav, content-length",
     vary: "Origin",
   };

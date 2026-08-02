@@ -7,7 +7,8 @@
     "build:assets": "node scripts/build-assets.mjs",
     "prepare:cloudflare": "node .github/workflows/prepare-cloudflare.mjs",
     "deploy": "npm run build:assets && npm run prepare:cloudflare && wrangler d1 migrations apply webdav_db --remote && wrangler deploy --keep-vars",
-    "check": "node --check src/index.js && node --check pages-user/app.js && node --check pages-admin/app.js && node --check scripts/build-assets.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/index.js && node --check pages-user/app.js && node --check pages-admin/app.js && node --check scripts/build-assets.mjs && npm run test"
   },
   "devDependencies": {
     "esbuild": "^0.27.1",

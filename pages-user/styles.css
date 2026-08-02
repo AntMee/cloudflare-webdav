@@ -1887,6 +1887,83 @@ tbody tr:hover {
   box-shadow: 0 18px 48px rgba(11, 18, 32, 0.28);
 }
 
+.connection-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #0b1220, #13243c);
+  color: #ffffff;
+  padding: 18px 20px;
+  box-shadow: 0 16px 42px rgba(11, 18, 32, 0.16);
+}
+
+.connection-card .section-label,
+.connection-card .muted {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.connection-card h2 {
+  margin-top: 6px;
+  color: #ffffff;
+}
+
+.connection-url {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(100%, 420px);
+}
+
+.connection-url code {
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #dbeafe;
+  padding: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 18, 32, 0.42);
+  padding: 20px;
+}
+
+.form-dialog {
+  width: min(440px, 100%);
+  border: 0;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(11, 18, 32, 0.28);
+  padding: 22px;
+}
+
+.form-dialog .field + .field {
+  margin-top: 14px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dialog-actions .primary-button {
+  margin-top: 0;
+}
+
 @media (max-width: 960px) {
   .login-layout {
     grid-template-columns: 1fr;
@@ -1926,6 +2003,12 @@ tbody tr:hover {
   .app-header {
     top: 0;
     border-radius: 16px;
+  }
+
+  .connection-card,
+  .connection-url {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .view-heading,

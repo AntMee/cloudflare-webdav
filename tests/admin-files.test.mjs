@@ -127,6 +127,30 @@ test("admin can create a folder in the admin account's file space", async () => 
   ]);
 });
 
+test("admin can rename a file in the admin account's file space", async () => {
+  const env = createTestEnv();
+  const token = await adminToken(env);
+  env.KV.values.set("users/admin-user/DouyinBackup/config_backup.json", new TextEncoder().encode('{"ok":true}').buffer);
+
+  const response = await worker.fetch(new Request("https://example.test/api/admin/files/move", {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      source: "/DouyinBackup/config_backup.json",
+      destination: "/DouyinBackup/config_renamed.json",
+    }),
+  }), env);
+
+  assert.equal(response.status, 200);
+  assert.equal(env.DB.data.nodes.some((item) => item.path === "/DouyinBackup/config_backup.json"), false);
+  assert.equal(env.DB.data.nodes.some((item) => item.path === "/DouyinBackup/config_renamed.json"), true);
+  assert.equal(env.KV.values.has("users/admin-user/DouyinBackup/config_backup.json"), false);
+  assert.equal(env.KV.values.has("users/admin-user/DouyinBackup/config_renamed.json"), true);
+});
+
 test("admin can delete a file in the admin account's file space", async () => {
   const env = createTestEnv();
   const token = await adminToken(env);
@@ -344,6 +368,101 @@ test("WebDAV PUT rejects uploads without a valid content length", async () => {
   assert.equal(response.status, 411);
 });
 
+test("WebDAV MOVE renames a file and preserves its stored content", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "move-user",
+    username: "move-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+  env.DB.data.nodes.push(
+    node("/", "directory", { owner_user_id: "move-user" }),
+    node("/config.json", "file", {
+      owner_user_id: "move-user",
+      kv_key: "users/move-user/config.json",
+      mime_type: "application/json",
+      size: 2,
+    }),
+  );
+  env.KV.values.set("users/move-user/config.json", new TextEncoder().encode("{}").buffer);
+
+  const response = await worker.fetch(new Request("https://example.test/dav/config.json", {
+    method: "MOVE",
+    headers: {
+      authorization: `Basic ${btoa("move-user:user-password")}`,
+      destination: "https://example.test/dav/renamed.json",
+    },
+  }), env);
+
+  assert.equal(response.status, 201);
+  assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "move-user" && item.path === "/config.json"), false);
+  const moved = env.DB.data.nodes.find((item) => item.owner_user_id === "move-user" && item.path === "/renamed.json");
+  assert.equal(moved?.kv_key, "users/move-user/renamed.json");
+  assert.equal(env.KV.values.has("users/move-user/config.json"), false);
+  assert.equal(await env.KV.get("users/move-user/renamed.json", "arrayBuffer") instanceof ArrayBuffer, true);
+});
+
+test("WebDAV MOVE moves a non-empty folder and descendants", async () => {
+  const env = createTestEnv({ includeAdminFiles: false });
+  const passwordHash = await createPasswordHash("user-password");
+  env.DB.data.users.push({
+    id: "move-folder-user",
+    username: "move-folder-user",
+    password_hash: passwordHash,
+    role: "user",
+    enabled: 1,
+    created_at: "2026-06-14T01:00:00.000Z",
+    updated_at: "2026-06-14T01:59:00.000Z",
+  });
+  env.DB.data.nodes.push(
+    node("/", "directory", { owner_user_id: "move-folder-user" }),
+    node("/Source/", "directory", { owner_user_id: "move-folder-user" }),
+    node("/Source/Nested/", "directory", { owner_user_id: "move-folder-user" }),
+    node("/Source/Nested/item.json", "file", {
+      owner_user_id: "move-folder-user",
+      kv_key: "users/move-folder-user/Source/Nested/item.json",
+      size: 2,
+    }),
+  );
+  env.KV.values.set("users/move-folder-user/Source/Nested/item.json", new TextEncoder().encode("{}").buffer);
+
+  const response = await worker.fetch(new Request("https://example.test/dav/Source/", {
+    method: "MOVE",
+    headers: {
+      authorization: `Basic ${btoa("move-folder-user:user-password")}`,
+      destination: "https://example.test/dav/Renamed/",
+    },
+  }), env);
+
+  assert.equal(response.status, 201);
+  assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "move-folder-user" && item.path === "/Source/Nested/item.json"), false);
+  assert.equal(env.DB.data.nodes.some((item) => item.owner_user_id === "move-folder-user" && item.path === "/Renamed/Nested/item.json"), true);
+  assert.equal(env.KV.values.has("users/move-folder-user/Source/Nested/item.json"), false);
+  assert.equal(env.KV.values.has("users/move-folder-user/Renamed/Nested/item.json"), true);
+});
+
+test("WebDAV returns a setup error when D1 migrations have not run", async () => {
+  const env = createTestEnv();
+  env.DB.data.failMissingTables = true;
+
+  const response = await worker.fetch(new Request("https://example.test/dav/", {
+    method: "PROPFIND",
+    headers: {
+      authorization: `Basic ${btoa("any-user:any-password")}`,
+      "x-webdav-web": "1",
+    },
+  }), env);
+
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
+  assert.match((await response.json()).error, /D1 migrations/);
+});
+
 test("WebDAV DELETE removes a non-empty folder only for the current user", async () => {
   const env = createTestEnv({ includeAdminFiles: false });
   const passwordHash = await createPasswordHash("user-password");
@@ -550,11 +669,12 @@ function createTestEnv({
     async get(key, type) {
       if (type !== "arrayBuffer") return this.values.get(key) || null;
       assert.equal(type, "arrayBuffer");
+      if (this.values.has(key)) return this.values.get(key);
       if (key !== "users/admin-user/DouyinBackup/config_backup.json") return null;
       return new TextEncoder().encode('{"ok":true}').buffer;
     },
     async put(key, value) {
-      this.values.set(key, String(value));
+      this.values.set(key, value);
     },
     async delete(key) {
       this.deletedKeys.push(key);
@@ -612,7 +732,12 @@ class FakeStatement {
     return this;
   }
 
+  maybeFailMissingTables() {
+    if (this.data.failMissingTables) throw new Error("D1_ERROR: no such table: users: SQLITE_ERROR");
+  }
+
   async first() {
+    this.maybeFailMissingTables();
     if (this.sql.includes("SELECT * FROM users WHERE username = ?")) {
       return this.data.users.find((user) => user.username === this.params[0] && user.enabled === 1) || null;
     }
@@ -631,6 +756,7 @@ class FakeStatement {
   }
 
   async all() {
+    this.maybeFailMissingTables();
     if (this.sql.includes("SELECT * FROM nodes")) {
       return {
         results: this.data.nodes
@@ -649,6 +775,7 @@ class FakeStatement {
   }
 
   async run() {
+    this.maybeFailMissingTables();
     if (this.sql.includes("INSERT INTO users")) {
       const role = this.sql.includes("'admin'") ? "admin" : this.params[3];
       const createdAt = this.sql.includes("'admin'") ? this.params[3] : this.params[4];
@@ -683,6 +810,15 @@ class FakeStatement {
       this.data.nodes = this.data.nodes.filter((node) => (
         node.owner_user_id !== this.params[0] || node.path !== this.params[1]
       ));
+      return {};
+    }
+    if (this.sql.includes("UPDATE nodes SET path = ?, kv_key = ?, updated_at = ? WHERE owner_user_id = ? AND path = ?")) {
+      const item = this.data.nodes.find((node) => node.owner_user_id === this.params[3] && node.path === this.params[4]);
+      if (item) {
+        item.path = this.params[0];
+        item.kv_key = this.params[1];
+        item.updated_at = this.params[2];
+      }
       return {};
     }
     return {};

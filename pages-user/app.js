@@ -11,6 +11,8 @@ const state = {
   users: [],
   selectedFiles: new Set(),
   selectedAdminFiles: new Set(),
+  resetUserId: "",
+  renameTarget: null,
   filePage: 1,
   adminFilePage: 1,
   pageSize: Number(sessionStorage.getItem("webdavPageSize")) || 20,
@@ -116,6 +118,8 @@ const elements = {
   adminPageSize: document.querySelector("#admin-page-size"),
   adminFileList: document.querySelector("#admin-file-list"),
   adminFileEmptyState: document.querySelector("#admin-file-empty-state"),
+  webdavUrl: document.querySelector("#webdav-url"),
+  copyWebdavUrl: document.querySelector("#copy-webdav-url"),
   refreshFiles: document.querySelector("#refresh-files"),
   backFolder: document.querySelector("#back-folder"),
   showFolderForm: document.querySelector("#show-folder-form"),
@@ -144,6 +148,17 @@ const elements = {
   confirmTarget: document.querySelector("#confirm-target"),
   confirmOk: document.querySelector("#confirm-ok"),
   confirmCancel: document.querySelector("#confirm-cancel"),
+  passwordOverlay: document.querySelector("#password-overlay"),
+  passwordForm: document.querySelector("#password-form"),
+  passwordUserLabel: document.querySelector("#password-user-label"),
+  resetPassword: document.querySelector("#reset-password"),
+  resetPasswordConfirm: document.querySelector("#reset-password-confirm"),
+  passwordCancel: document.querySelector("#password-cancel"),
+  renameOverlay: document.querySelector("#rename-overlay"),
+  renameForm: document.querySelector("#rename-form"),
+  renameFileLabel: document.querySelector("#rename-file-label"),
+  renameName: document.querySelector("#rename-name"),
+  renameCancel: document.querySelector("#rename-cancel"),
 };
 
 function t(key, params = {}) {
@@ -193,6 +208,11 @@ elements.nextPage.addEventListener("click", () => changeFilePage(1));
 elements.pageSize.addEventListener("change", handlePageSizeChange);
 elements.confirmCancel.addEventListener("click", () => closeConfirmDialog(false));
 elements.confirmOk.addEventListener("click", () => closeConfirmDialog(true));
+elements.copyWebdavUrl.addEventListener("click", copyWebdavUrl);
+elements.passwordCancel.addEventListener("click", closePasswordDialog);
+elements.passwordForm.addEventListener("submit", handleResetPasswordSubmit);
+elements.renameCancel.addEventListener("click", closeRenameDialog);
+elements.renameForm.addEventListener("submit", handleRenameSubmit);
 elements.confirmOverlay.addEventListener("click", (event) => {
   if (event.target === elements.confirmOverlay) closeConfirmDialog(false);
 });
@@ -384,22 +404,105 @@ async function toggleUser(userId, enabled) {
   }
 }
 
-async function resetPassword(userId) {
-  const password = window.prompt("请输入新密码，至少 8 位");
-  if (!password) return;
+function resetPassword(userId) {
+  const user = state.users.find((item) => item.id === userId);
+  state.resetUserId = userId;
+  elements.passwordUserLabel.textContent = user ? `用户：${user.username}` : "请输入新密码。";
+  elements.passwordForm.reset();
+  elements.passwordOverlay.classList.remove("hidden");
+  elements.resetPassword.focus();
+}
+
+async function handleResetPasswordSubmit(event) {
+  event.preventDefault();
+  const password = elements.resetPassword.value;
+  const confirmation = elements.resetPasswordConfirm.value;
   if (password.length < 8) {
     showToast("密码至少需要 8 位", true);
     return;
   }
+  if (password !== confirmation) {
+    showToast("两次输入的密码不一致", true);
+    return;
+  }
 
   try {
-    await adminApi(`/api/admin/users/${encodeURIComponent(userId)}/password`, {
+    await adminApi(`/api/admin/users/${encodeURIComponent(state.resetUserId)}/password`, {
       method: "PATCH",
       body: JSON.stringify({ password }),
     });
+    closePasswordDialog();
     showToast("密码已重置");
   } catch (error) {
     showToast(error.message, true);
+  }
+}
+
+function closePasswordDialog() {
+  state.resetUserId = "";
+  elements.passwordOverlay.classList.add("hidden");
+}
+
+function openRenameDialog(file, options = {}) {
+  state.renameTarget = { file, admin: Boolean(options.admin) };
+  elements.renameFileLabel.textContent = `当前名称：${file.name}`;
+  elements.renameName.value = file.name;
+  elements.renameOverlay.classList.remove("hidden");
+  elements.renameName.focus();
+  elements.renameName.select();
+}
+
+function closeRenameDialog() {
+  state.renameTarget = null;
+  elements.renameOverlay.classList.add("hidden");
+}
+
+async function handleRenameSubmit(event) {
+  event.preventDefault();
+  if (!state.renameTarget) return;
+  const nextName = elements.renameName.value.trim();
+  const { file, admin } = state.renameTarget;
+  if (!isValidEntryName(nextName)) {
+    showToast("名称无效", true);
+    return;
+  }
+  const base = admin ? state.adminCurrentPath : state.currentPath;
+  const targetPath = file.type === "directory" ? ensureDirectory(joinPath(base, nextName)) : joinPath(base, nextName);
+  const sourceUrl = davUrl(file.path);
+  const destinationUrl = new URL(davUrl(targetPath), window.location.origin).href;
+  try {
+    if (admin) {
+      await adminApi("/api/admin/files/move", {
+        method: "PATCH",
+        body: JSON.stringify({ source: file.path, destination: targetPath }),
+      });
+    } else {
+      const response = await fetch(sourceUrl, {
+        method: "MOVE",
+        headers: {
+          authorization: state.userAuth,
+          destination: destinationUrl,
+          "x-webdav-web": "1",
+        },
+      });
+      if (!response.ok) throw new Error(`重命名失败：${response.status}`);
+    }
+    closeRenameDialog();
+    if (admin) await loadAdminDirectory(state.adminCurrentPath);
+    else await loadDirectory(state.currentPath);
+    showToast("已重命名");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+}
+
+async function copyWebdavUrl() {
+  const url = new URL("/dav/", window.location.origin).href;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast("WebDAV 地址已复制");
+  } catch {
+    showToast(url);
   }
 }
 
@@ -760,6 +863,13 @@ function renderFiles() {
     });
   });
 
+  elements.fileList.querySelectorAll("[data-rename]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const file = state.files.find((item) => item.path === button.dataset.rename);
+      if (file) openRenameDialog(file, { admin: false });
+    });
+  });
+
   elements.fileList.querySelectorAll("[data-select]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
       setSelection(state.selectedFiles, checkbox.dataset.select, checkbox.checked);
@@ -815,6 +925,13 @@ function renderAdminFiles() {
     });
   });
 
+  elements.adminFileList.querySelectorAll("[data-admin-rename]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const file = state.adminFiles.find((item) => item.path === button.dataset.adminRename);
+      if (file) openRenameDialog(file, { admin: true });
+    });
+  });
+
   elements.adminFileList.querySelectorAll("[data-admin-select]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
       setSelection(state.selectedAdminFiles, checkbox.dataset.adminSelect, checkbox.checked);
@@ -828,6 +945,7 @@ function fileRow(file, options = {}) {
   const openAttr = options.admin ? "data-admin-open" : "data-open";
   const downloadAttr = options.admin ? "data-admin-download" : "data-download";
   const deleteAttr = options.admin ? "data-admin-delete" : "data-delete";
+  const renameAttr = options.admin ? "data-admin-rename" : "data-rename";
   const selectAttr = options.admin ? "data-admin-select" : "data-select";
   const selected = options.admin ? state.selectedAdminFiles.has(file.path) : state.selectedFiles.has(file.path);
   const checkedAttr = selected ? " checked" : "";
@@ -851,6 +969,7 @@ function fileRow(file, options = {}) {
       <td>
         <div class="row-actions">
           ${downloadButton}
+          <button class="table-action" type="button" ${renameAttr}="${escapeHtml(file.path)}">重命名</button>
           <button class="table-action danger" type="button" ${deleteAttr}="${escapeHtml(file.path)}">${escapeHtml(t("delete"))}</button>
         </div>
       </td>
@@ -1075,6 +1194,7 @@ function showFilesView() {
   if (elements.currentUserLabel) {
     elements.currentUserLabel.textContent = state.username ? `用户：${state.username}` : "普通用户";
   }
+  if (elements.webdavUrl) elements.webdavUrl.textContent = new URL("/dav/", window.location.origin).href;
   updateFileStats();
 }
 
@@ -1135,7 +1255,11 @@ function parentDirectory(path) {
 }
 
 function isValidFolderName(name) {
-  return /^[^\\/:*?"<>|]{1,80}$/.test(name);
+  return isValidEntryName(name);
+}
+
+function isValidEntryName(name) {
+  return /^[^\\/:*?"<>|]{1,80}$/.test(name) && name !== "." && name !== "..";
 }
 
 function sortFiles(left, right) {

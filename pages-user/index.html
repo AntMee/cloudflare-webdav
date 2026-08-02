@@ -381,6 +381,18 @@
 
             <nav class="breadcrumbs pathbar" id="breadcrumbs" aria-label="当前位置"></nav>
 
+            <section class="connection-card" aria-labelledby="connection-title">
+              <div>
+                <p class="section-label">WebDAV</p>
+                <h2 id="connection-title">客户端连接</h2>
+                <p class="muted">在系统文件管理器或 WebDAV 客户端中使用当前账号同步文件。</p>
+              </div>
+              <div class="connection-url">
+                <code id="webdav-url">/dav/</code>
+                <button class="ghost-button" id="copy-webdav-url" type="button">复制地址</button>
+              </div>
+            </section>
+
             <section class="file-section" aria-labelledby="file-list-title">
               <div class="section-heading row-heading file-list-heading">
                 <div>
@@ -483,6 +495,42 @@
     </main>
 
     <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+    <div class="form-overlay hidden" id="password-overlay" role="presentation">
+      <form class="form-dialog" id="password-form" aria-labelledby="password-title">
+        <div class="section-heading">
+          <h2 id="password-title">重置密码</h2>
+          <p class="muted" id="password-user-label">请输入新密码。</p>
+        </div>
+        <label class="field" for="reset-password">
+          <span>新密码</span>
+          <input id="reset-password" type="password" minlength="8" autocomplete="new-password" required />
+        </label>
+        <label class="field" for="reset-password-confirm">
+          <span>确认密码</span>
+          <input id="reset-password-confirm" type="password" minlength="8" autocomplete="new-password" required />
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-button" id="password-cancel" type="button">取消</button>
+          <button class="primary-button inline" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+    <div class="form-overlay hidden" id="rename-overlay" role="presentation">
+      <form class="form-dialog" id="rename-form" aria-labelledby="rename-title">
+        <div class="section-heading">
+          <h2 id="rename-title">重命名</h2>
+          <p class="muted" id="rename-file-label">输入新的名称。</p>
+        </div>
+        <label class="field" for="rename-name">
+          <span>新名称</span>
+          <input id="rename-name" autocomplete="off" required />
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-button" id="rename-cancel" type="button">取消</button>
+          <button class="primary-button inline" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
     <div class="confirm-overlay hidden" id="confirm-overlay" role="presentation">
       <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
         <div class="confirm-icon" aria-hidden="true">
