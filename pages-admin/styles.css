@@ -1,20 +1,22 @@
 :root {
-  --bg: #f5f7fb;
+  --bg: #edf2f6;
   --surface: #ffffff;
-  --surface-subtle: #f8fafc;
-  --text: #172033;
-  --muted: #647084;
-  --border: #d9e0ea;
-  --border-strong: #c7d1df;
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --danger: #dc2626;
-  --danger-bg: #fef2f2;
-  --success: #15803d;
-  --success-bg: #f0fdf4;
-  --warning: #b45309;
-  --warning-bg: #fffbeb;
-  --shadow: 0 18px 50px rgba(23, 32, 51, 0.08);
+  --surface-subtle: #f6f9fc;
+  --text: #101827;
+  --muted: #657386;
+  --border: #d9e1eb;
+  --border-strong: #bfccd9;
+  --accent: #155fcb;
+  --accent-strong: #0f4fae;
+  --danger: #bd3737;
+  --danger-bg: #fff0f0;
+  --success: #167a59;
+  --success-bg: #e8f6ef;
+  --warning: #9f620d;
+  --warning-bg: #fff4dc;
+  --shadow: 0 24px 70px rgba(16, 24, 39, 0.11);
+  --shadow-soft: 0 12px 34px rgba(16, 24, 39, 0.07);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --radius: 8px;
 }
 
@@ -488,6 +490,96 @@ tbody tr:last-child td {
 .dialog-actions .primary-button {
   width: auto;
   margin-top: 0;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background-image:
+    linear-gradient(rgba(16, 24, 39, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 24, 39, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 58%);
+}
+
+.login-panel,
+.create-user,
+.user-section,
+.metric {
+  box-shadow: var(--shadow-soft), var(--shadow-inset);
+}
+
+.login-panel,
+.user-section,
+.create-user {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.brand-mark,
+.avatar {
+  background: #e9f2ff;
+}
+
+input,
+select {
+  background: #fbfdff;
+}
+
+input:focus,
+select:focus {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(21, 95, 203, 0.14);
+}
+
+.primary-button {
+  background: linear-gradient(180deg, #1c6ddb, var(--accent));
+  box-shadow: 0 12px 24px rgba(21, 95, 203, 0.22);
+}
+
+.primary-button:hover {
+  background: linear-gradient(180deg, #1965cc, var(--accent-strong));
+  box-shadow: 0 14px 28px rgba(21, 95, 203, 0.27);
+}
+
+.ghost-button:hover,
+.preview-button:hover,
+.table-action:hover {
+  background: #f4f8fc;
+  border-color: #aebdcd;
+  color: #182338;
+}
+
+.metric {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.table-wrap {
+  background: #ffffff;
+}
+
+th {
+  background: #f4f7fb;
+}
+
+tbody tr {
+  transition: background 0.15s ease;
+}
+
+tbody tr:hover {
+  background: #f8fbff;
+}
+
+.badge {
+  border: 1px solid rgba(191, 204, 217, 0.7);
+}
+
+.toast {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
 }
 
 @media (max-width: 860px) {
